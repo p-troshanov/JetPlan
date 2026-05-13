@@ -4,6 +4,7 @@ node_modules/
 dist/
 dist-ssr/
 *.local
+**/.gemini_backups
 
 # Python
 __pycache__/

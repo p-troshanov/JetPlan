@@ -1,0 +1,382 @@
+/* frontend/src/assets/tasks.css */
+.tasks-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  width: 100%;
+  max-width: 100%;
+  margin: 0 auto;
+}
+
+.tasks-top-controls {
+  background: var(--color-background-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 1rem 1.5rem;
+}
+
+.controls-main-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.controls-right {
+  display: flex;
+  gap: 1rem;
+}
+
+.create-task-btn {
+  max-width: 200px;
+}
+
+.filters-panel {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--color-border);
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1.5rem;
+}
+
+.tasks-main {
+  flex: 1;
+  background: var(--color-background-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  /* Уменьшили верхний отступ (0.5rem) для шапки и нижний (1rem) под списком */
+  padding: 0.5rem 1.5rem 1rem 1.5rem; 
+  min-height: 300px; 
+  width: 100%;
+}
+
+/* --- Сайбар и контролы --- */
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.filter-group label {
+  font-size: 0.85rem;
+  color: var(--color-text-light-2);
+  font-weight: 600;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.6rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: inherit;
+}
+
+.form-control-sm {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.9rem;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.btn {
+  width: 100%;
+  padding: 0.8rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.btn-small {
+  padding: 0.5rem;
+  font-size: 0.8rem;
+}
+
+.btn-primary {
+  background-color: hsla(160, 100%, 37%, 1);
+  color: #fff;
+}
+
+.btn-primary:hover {
+  background-color: hsla(160, 100%, 32%, 1);
+}
+
+.btn-secondary {
+  background-color: var(--color-background-mute);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  padding: 0.6rem 1.2rem;
+}
+
+.btn-secondary:hover {
+  border-color: var(--color-border-hover);
+}
+
+.icon-rotated {
+  transform: rotate(180deg);
+}
+
+.mobile-only {
+  display: none;
+}
+
+/* --- Список задач --- */
+.tasks-header-row {
+  display: grid;
+  grid-template-columns: 30px 160px 40px minmax(300px, 1fr) 140px 100px; 
+  gap: 1.5rem;
+  padding: 0.25rem 1rem;
+  font-size: 0.85rem;
+  color: var(--color-text-light-2);
+  border-bottom: 2px solid var(--color-border);
+  margin-bottom: 0.5rem;
+}
+
+.task-item {
+  display: grid;
+  grid-template-columns: 30px 160px 40px minmax(300px, 1fr) 140px 100px;
+  gap: 1.5rem;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--color-background);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin-bottom: 0.5rem;
+  transition: box-shadow 0.2s, padding 0.2s ease, border-color 0.2s;
+}
+
+.task-item:hover {
+  border-color: var(--color-border-hover);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+
+.task-item.is-completed {
+  opacity: 0.6;
+}
+
+.task-item.is-completed .task-text {
+  text-decoration: line-through;
+}
+
+/* Класс для элемента-фантома при перетаскивании vuedraggable */
+.ghost-task {
+  opacity: 0.4;
+  background: var(--color-background-mute);
+  border: 2px dashed hsla(160, 100%, 37%, 1);
+}
+
+.drag-handle {
+  cursor: grab;
+  color: var(--color-text-light-2);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.task-date { 
+  font-size: 0.85rem; 
+  white-space: nowrap;
+}
+
+.task-text { 
+  font-weight: 500; 
+  word-break: break-word;
+  line-height: 1.4;
+}
+
+.priority-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.priority-dot {
+  font-size: 1.1rem;
+  cursor: help;
+  display: inline-block;
+}
+
+.category-badge {
+  background: var(--color-background-mute);
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.task-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.action-icon {
+  background: transparent;
+  border: none;
+  color: var(--color-text-light-2);
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.action-icon:hover {
+  background: var(--color-background-mute);
+  color: var(--color-heading);
+}
+
+.action-icon.complete:hover { color: #4caf50; }
+
+/* --- Модальные окна --- */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(2px);
+}
+
+.modal-content {
+  background: var(--color-background);
+  padding: 2rem;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 500px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  border: 1px solid var(--color-border);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 1.2rem;
+}
+
+.modal-footer {
+  margin-top: 2rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.close-btn {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: var(--color-text-light-2);
+  cursor: pointer;
+  padding: 0.2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  color: var(--color-heading);
+  background: var(--color-background-mute);
+}
+
+/* --- Список категорий --- */
+.category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.category-list-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.8rem;
+  background: var(--color-background-soft);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+}
+
+/* Адаптив */
+@media (max-width: 1024px) {
+  .tasks-header-row { display: none; }
+  
+  .task-item {
+    grid-template-columns: 30px 1fr auto auto; 
+    grid-template-rows: auto auto;
+    padding-top: 0.75rem !important;
+    gap: 0.5rem 1rem;
+  }
+  
+  .drag-handle { grid-column: 1; grid-row: 1 / 3; }
+  .task-text { grid-column: 2 / 5; grid-row: 1; padding-bottom: 0.2rem; }
+  .task-date { grid-column: 2; grid-row: 2; align-self: center; color: var(--color-text-light-2); }
+  .priority-wrapper { grid-column: 3; grid-row: 2; align-self: center; } 
+  .task-actions { grid-column: 4; grid-row: 2; align-self: center; justify-self: end; }
+  .category-badge { display: none; }
+  
+  .filters-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 600px) {
+  .controls-main-row { 
+    flex-direction: row; 
+    justify-content: space-between; 
+    align-items: center;
+  }
+  .controls-right { 
+    gap: 0.5rem; 
+  }
+  
+  .btn-text { display: none; }
+  .mobile-only { display: block; }
+  .dropdown-icon { display: none; }
+  
+  .create-task-btn { max-width: max-content; }
+  .btn-secondary { padding: 0.6rem; width: auto; }
+  
+  .filters-grid { grid-template-columns: 1fr; }
+}

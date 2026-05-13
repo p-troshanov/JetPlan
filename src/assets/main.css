@@ -1,12 +1,11 @@
-/* frontend/src/assets/main.css */
+/* src/assets/main.css */
 @import './base.css';
 
 #app {
-  max-width: 1280px;
+  max-width: 100%; /* Убрали жесткое ограничение в 1280px */
   margin: 0 auto;
   padding: 2rem;
   font-weight: normal;
-  width: 100%;
 }
 
 a,
@@ -24,7 +23,13 @@ a,
 }
 
 @media (min-width: 1024px) {
+  /* Переопределяем стандартные стили Vue, которые ломали выравнивание */
+  body {
+    display: block; 
+  }
+
   #app {
+    display: block; 
     padding: 0 2rem;
   }
 }

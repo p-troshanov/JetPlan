@@ -1,3 +1,4 @@
+// frontend/src/components/HelloWorld.vue
 <script setup lang="ts">
 defineProps<{
   msg: string
