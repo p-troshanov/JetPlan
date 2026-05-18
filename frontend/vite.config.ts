@@ -11,8 +11,8 @@ export default defineConfig({
     allowedHosts: ['jetplan.site'],
     proxy: {
       '/api': {
-        // Указываем имя сервиса бэкенда и его внутренний порт
-        target: 'http://backend:8000', 
+        // Если есть переменная API_URL (на проде), берем её. Иначе (на локалке) стучимся в localhost
+        target: process.env.API_URL || 'http://127.0.0.1:8008', 
         changeOrigin: true
       }
     }

@@ -12,7 +12,8 @@ const formData = ref({
   last_name: '',
   ai_provider: 'gemini',
   ai_api_key: '',
-  task_hotkey: 'ctrl+q'
+  task_hotkey: 'ctrl+q',
+  auto_postpone_overdue: false
 })
 
 const passData = ref({
@@ -34,6 +35,7 @@ onMounted(async () => {
     formData.value.ai_provider = userStore.profile.ai_provider || 'gemini'
     formData.value.ai_api_key = userStore.profile.ai_api_key || ''
     formData.value.task_hotkey = userStore.profile.task_hotkey || 'ctrl+q'
+    formData.value.auto_postpone_overdue = userStore.profile.auto_postpone_overdue || false
   }
 })
 
@@ -169,8 +171,14 @@ const verifyTelegramCode = async () => {
             <small class="hint">Например: ctrl+q, alt+n. Работает независимо от раскладки.</small>
           </div>
           
-          <div></div>
-          <button class="btn btn-primary btn-auto" @click="saveProfile">Сохранить настройки</button>
+          <label class="checkbox-label" style="grid-column: 1 / -1; margin-top: 1rem;">
+            <input type="checkbox" v-model="formData.auto_postpone_overdue" />
+            Автоматически переносить просроченные задачи на сегодня (00:00) с отключением напоминаний
+          </label>
+          
+          <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end;">
+            <button class="btn btn-primary btn-auto" @click="saveProfile">Сохранить настройки</button>
+          </div>
         </div>
       </section>
 
@@ -283,6 +291,14 @@ const verifyTelegramCode = async () => {
 .settings-form-grid label {
   color: var(--color-text-light-2);
   font-weight: 500;
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.95rem;
 }
 
 .form-control {

@@ -348,7 +348,10 @@ const getPriorityLabel = (priority: string) => {
             <div class="drag-handle" title="Потяните для сортировки">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 8h16M4 16h16"/></svg>
             </div>
-            <div class="task-date" :title="getFullDateTooltip(task.due_at)">{{ formatDate(task.due_at) }}</div>
+            <div class="task-date" :title="getFullDateTooltip(task.due_at)">
+              {{ formatDate(task.due_at) }}
+              <svg v-if="task.recurrence_rule" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" title="Регулярная задача" style="vertical-align: text-bottom; margin-left: 4px; color: var(--color-text-light-2);"><path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 014-4h14"/><path d="M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 01-4 4H3"/></svg>
+            </div>
             <div class="priority-wrapper">
               <span class="priority-dot" :title="getPriorityLabel(task.priority)">
                 {{ getPriorityIcon(task.priority) }}
@@ -377,4 +380,3 @@ const getPriorityLabel = (priority: string) => {
     <CategoryModal v-if="showCatModal" @close="showCatModal = false" />
   </div>
 </template>
-

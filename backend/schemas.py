@@ -10,6 +10,7 @@ class UserProfileUpdate(BaseModel):
     ai_provider: Optional[str] = None
     ai_api_key: Optional[str] = None
     task_hotkey: Optional[str] = None
+    auto_postpone_overdue: Optional[bool] = None
 
 class UserProfileResponse(BaseModel):
     id: int
@@ -19,6 +20,7 @@ class UserProfileResponse(BaseModel):
     ai_provider: Optional[str] = None
     ai_api_key: Optional[str] = None
     task_hotkey: Optional[str] = None
+    auto_postpone_overdue: bool = False
     telegram_id: Optional[int] = None
     
     model_config = ConfigDict(from_attributes=True)
@@ -74,6 +76,7 @@ class TaskBase(BaseModel):
     due_at: Optional[datetime] = None
     priority: str = "medium"
     status: str = "pending"
+    recurrence_rule: Optional[str] = None
     reminder_enabled: bool = False
     reminder_minutes: int = 0
 
@@ -87,6 +90,7 @@ class TaskUpdate(BaseModel):
     priority: Optional[str] = None
     status: Optional[str] = None
     order_index: Optional[int] = None
+    recurrence_rule: Optional[str] = None
     reminder_enabled: Optional[bool] = None
     reminder_minutes: Optional[int] = None
     reminder_sent: Optional[bool] = None
@@ -113,4 +117,3 @@ class AIQueryResponse(BaseModel):
     action: str
     message: Optional[str] = None
     filters: Optional[dict] = None
-

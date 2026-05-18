@@ -84,15 +84,15 @@
 
 - **.gitignore** - *(25 строк)* `node_modules/ | dist/`
 - **Dockerfile** - *(22 строк)* `FROM python:3.11-slim | WORKDIR /app`
-- **requirements.txt** - *(2 строк)* `fastapi==0.1`
+- **requirements.txt** - *(13 строк)* `fastapi | uvicorn`
 - **_start_all.bat** - *(33 строк)* `@echo off | chcp 65001 >nul`
 - **backend/auth.py** - *(321 строк)* 🔗 Зависимости: [hashlib, hmac, random, string, datetime, typing] `class TelegramAuthData(BaseModel): | class UserRegisterData(BaseModel): | def verify_password(plain_password: str, hashed_password:...`
-- **backend/bot.py** - *(534 строк)* 🔗 Зависимости: [logging, os, json, asyncio, io, aiohttp] `class EditTaskState(StatesGroup): | def get_task_keyboard(task_id: int) -> InlineKeyboardMarkup: | def format_date_ru(date_obj: datetime) -> str:`
+- **backend/bot.py** - *(729 строк)* 🔗 Зависимости: [logging, os, json, asyncio, io, aiohttp] `class EditTaskState(StatesGroup): | class EditCategoryState(StatesGroup): | def get_task_keyboard(task_id: int) -> InlineKeyboardMarkup:`
 - **backend/config.py** - *(17 строк)* 🔗 Зависимости: [os, dotenv] `class Settings:`
-- **backend/database.py** - *(122 строк)* 🔗 Зависимости: [datetime, asyncio, orm, sqlalchemy, sql, config] `class UserProfile(Base): | class TelegramLinkCode(Base):`
-- **backend/main.py** - *(104 строк)* 🔗 Зависимости: [asyncio, fastapi, cors, contextlib, sqlalchemy, config] `async def lifespan(app: FastAPI):`
-- **backend/schemas.py** - *(116 строк)* 🔗 Зависимости: [pydantic, typing, datetime] `class UserProfileUpdate(BaseModel): | class UserProfileResponse(BaseModel): | class ChangePasswordRequest(BaseModel):`
-- **backend/tasks.py** - *(303 строк)* 🔗 Зависимости: [aiohttp, json, datetime, fastapi, asyncio, future] `async def create_category( | async def get_categories( | async def update_category(`
+- **backend/database.py** - *(124 строк)* 🔗 Зависимости: [datetime, asyncio, orm, sqlalchemy, sql, config] `class UserProfile(Base): | class TelegramLinkCode(Base):`
+- **backend/main.py** - *(108 строк)* 🔗 Зависимости: [asyncio, fastapi, cors, contextlib, sqlalchemy, config] `async def lifespan(app: FastAPI):`
+- **backend/schemas.py** - *(119 строк)* 🔗 Зависимости: [pydantic, typing, datetime] `class UserProfileUpdate(BaseModel): | class UserProfileResponse(BaseModel): | class ChangePasswordRequest(BaseModel):`
+- **backend/tasks.py** - *(369 строк)* 🔗 Зависимости: [aiohttp, json, asyncio, datetime, rrule, fastapi] `async def create_category( | async def get_categories(`
 - **frontend/.gitignore** - *(39 строк)* `logs | *.log`
 - **frontend/Dockerfile** - *(14 строк)* `FROM node:20-alpine | WORKDIR /app`
 - **frontend/env.d.ts** - *(2 строк)* `[Конфиг / Без сигнатур]`
@@ -109,7 +109,7 @@
 - **frontend/src/assets/base.css** - *(87 строк)* `:root { | --vt-c-white: #ffffff;`
 - **frontend/src/assets/logo.svg** - *(1 строк)* `[Конфиг / Без сигнатур]`
 - **frontend/src/assets/main.css** - *(30 строк)* `@import './base.css'; | max-width: 1280px;`
-- **frontend/src/assets/tasks.css** - *(382 строк)* `.tasks-dashboard { | display: flex;`
+- **frontend/src/assets/tasks.css** - *(434 строк)* `.tasks-dashboard { | display: flex;`
 - **frontend/src/components/HelloWorld.vue** - *(42 строк)* `defineProps<{ | msg: string`
 - **frontend/src/components/TelegramLogin.vue** - *(70 строк)* `interface Window`
 - **frontend/src/components/TheWelcome.vue** - *(96 строк)* 🔗 Зависимости: [WelcomeItem, IconDocumentation, IconTooling, IconEcosystem, IconCommunity, IconSupport] `const openReadmeInEditor = () => fetch('/__open-in-editor?fi`
@@ -120,17 +120,17 @@
 - **frontend/src/components/icons/IconSupport.vue** - *(8 строк)* `<template> | <svg xmlns="http://www.w3.org/2000/svg" width="20" height="2`
 - **frontend/src/components/icons/IconTooling.vue** - *(20 строк)* `<!-- This icon is from <https://github.com/Templarian/Materi | <template>`
 - **frontend/src/components/tasks/CategoryModal.vue** - *(98 строк)* 🔗 Зависимости: [tasks] `const emit = defineEmits(['close']) | const store = useTasksStore()`
-- **frontend/src/components/tasks/TaskModal.vue** - *(166 строк)* 🔗 Зависимости: [tasks, types] `const props = defineProps<{ | taskToEdit?: Task | null`
-- **frontend/src/components/tasks/TasksDashboard.vue** - *(380 строк)* 🔗 Зависимости: [tasks, user, vuedraggable, types, TaskModal, CategoryModal] `[Конфиг / Без сигнатур]`
+- **frontend/src/components/tasks/TaskModal.vue** - *(180 строк)* 🔗 Зависимости: [tasks, types] `const props = defineProps<{ | taskToEdit?: Task | null`
+- **frontend/src/components/tasks/TasksDashboard.vue** - *(382 строк)* 🔗 Зависимости: [tasks, user, vuedraggable, types, TaskModal, CategoryModal] `[Конфиг / Без сигнатур]`
 - **frontend/src/router/index.ts** - *(29 строк)* 🔗 Зависимости: [HomeView] `export default router`
 - **frontend/src/stores/counter.ts** - *(13 строк)* `export const useCounterStore = defineStore('counter', () =>`
 - **frontend/src/stores/tasks.ts** - *(211 строк)* 🔗 Зависимости: [types] `export const useTasksStore = defineStore('tasks', () =>`
 - **frontend/src/stores/user.ts** - *(59 строк)* `export interface UserProfile | export const useUserStore = defineStore('user', () =>`
-- **frontend/src/types/index.ts** - *(23 строк)* `export interface Category | export interface Task`
+- **frontend/src/types/index.ts** - *(24 строк)* `export interface Category | export interface Task`
 - **frontend/src/views/AboutView.vue** - *(16 строк)* `<template> | <div class="about">`
 - **frontend/src/views/HomeView.vue** - *(294 строк)* 🔗 Зависимости: [TasksDashboard, TelegramLogin] `const router = useRouter() | const isAuthenticated = ref(false)`
-- **frontend/src/views/SettingsView.vue** - *(388 строк)* 🔗 Зависимости: [user] `const router = useRouter() | const userStore = useUserStore()`
-- **nginx/nginx.conf** - *(40 строк)* `worker_processes  1; | events {`
+- **frontend/src/views/SettingsView.vue** - *(404 строк)* 🔗 Зависимости: [user] `const router = useRouter() | const userStore = useUserStore()`
+- **nginx/nginx.conf** - *(27 строк)* `server { | listen 80;`
 - **src/assets/main.css** - *(35 строк)* `@import './base.css'; | max-width: 100%; /* Убрали жесткое ограничение в 1280px */`
 
 

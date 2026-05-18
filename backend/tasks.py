@@ -1,7 +1,9 @@
 # backend/tasks.py
 import aiohttp
 import json
+import asyncio
 from datetime import datetime, timezone
+from dateutil.rrule import rrulestr
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
@@ -9,7 +11,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import func, delete
 from typing import List
 
-from backend.database import get_db, Task, TaskCategory, UserProfile
+from backend.database import get_db, AsyncSessionLocal, Task, TaskCategory, UserProfile
 from backend.auth import get_current_user
 from backend.schemas import (
     TaskCategoryCreate, TaskCategoryUpdate, TaskCategoryResponse,
@@ -161,10 +163,24 @@ async def update_task(
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     
+    old_status = task.status
     update_data = data.model_dump(exclude_unset=True)
+    
     for key, value in update_data.items():
         setattr(task, key, value)
         
+    # Если задачу выполнили, а она регулярная
+    if old_status != "completed" and task.status == "completed" and task.recurrence_rule and task.due_at:
+        try:
+            rule = rrulestr(task.recurrence_rule, dtstart=task.due_at.replace(tzinfo=None))
+            next_dt = rule.after(task.due_at.replace(tzinfo=None))
+            if next_dt:
+                task.due_at = next_dt.replace(tzinfo=timezone.utc)
+                task.status = "pending"  # Возвращаем в активные
+                task.reminder_sent = False # Сбрасываем отправку
+        except Exception as e:
+            print(f"RRULE update error: {e}")
+
     # Сбрасываем флаг отправки, если изменились дата или настройки напоминания
     if any(k in update_data for k in ("due_at", "reminder_enabled", "reminder_minutes")):
         task.reminder_sent = False
@@ -301,3 +317,53 @@ async def process_ai_action(
     filters = parsed.get("filters", {})
     return AIQueryResponse(action="filter", message=message, filters=filters)
 
+
+# ==========================================
+# CRON JOB (Фоновые задачи)
+# ==========================================
+
+async def run_daily_cron():
+    """
+    Фоновый процесс, который запускается регулярно.
+    Следит за просроченными задачами и регулярностью.
+    """
+    while True:
+        try:
+            now = datetime.now(timezone.utc)
+            async with AsyncSessionLocal() as session:
+                # Находим все незавершенные просроченные задачи вместе с профилем юзера
+                result = await session.execute(
+                    select(Task, UserProfile)
+                    .join(UserProfile, Task.user_id == UserProfile.id)
+                    .where(Task.status == 'pending', Task.due_at < now)
+                )
+                
+                for task, user in result.all():
+                    # 1. Если это Регулярная задача
+                    if task.recurrence_rule:
+                        try:
+                            rule = rrulestr(task.recurrence_rule, dtstart=task.due_at.replace(tzinfo=None))
+                            next_dt = rule.after(task.due_at.replace(tzinfo=None))
+                            # Если следующее повторение тоже в прошлом или сейчас (т.е. мы его уже перешагнули)
+                            if next_dt and now.replace(tzinfo=None) >= next_dt:
+                                task.due_at = next_dt.replace(tzinfo=timezone.utc)
+                                task.reminder_sent = False
+                        except Exception:
+                            pass
+                    
+                    # 2. Если это обычная задача, а у юзера включен автоперенос
+                    elif user.auto_postpone_overdue:
+                        # Получаем начало текущих суток
+                        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+                        # Переносим, только если она старее чем начало текущего дня
+                        if task.due_at < today_start:
+                            task.due_at = today_start
+                            task.reminder_enabled = False
+                            task.reminder_sent = False
+                
+                await session.commit()
+        except Exception as e:
+            print(f"Cron auto-postpone error: {e}")
+        
+        # Проверяем каждые 10 минут
+        await asyncio.sleep(600)

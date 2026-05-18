@@ -33,6 +33,7 @@ class UserProfile(Base):
     ai_provider: Mapped[str] = mapped_column(String, default="gemini")
     ai_api_key: Mapped[str] = mapped_column(String, nullable=True)
     task_hotkey: Mapped[str] = mapped_column(String, default="ctrl+q")
+    auto_postpone_overdue: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     
     bot_token: Mapped[str] = mapped_column(String, unique=True, nullable=True)
     groq_token: Mapped[str] = mapped_column(String, nullable=True)
@@ -107,7 +108,8 @@ class Task(Base):
     order_index: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     
-    # Поля для напоминаний
+    # Поля для регулярности и напоминаний
+    recurrence_rule: Mapped[str] = mapped_column(String, nullable=True)
     reminder_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     reminder_minutes: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     reminder_sent: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")

@@ -47,7 +47,6 @@
   background: var(--color-background-soft);
   border: 1px solid var(--color-border);
   border-radius: 12px;
-  /* Уменьшили верхний отступ (0.5rem) для шапки и нижний (1rem) под списком */
   padding: 0.5rem 1.5rem 1rem 1.5rem; 
   min-height: 300px; 
   width: 100%;
@@ -204,6 +203,7 @@
   font-weight: 500; 
   word-break: break-word;
   line-height: 1.4;
+  white-space: pre-wrap; /* Сохранение отступов и переносов */
 }
 
 .priority-wrapper {
@@ -293,11 +293,23 @@
   gap: 1.2rem;
 }
 
-.modal-footer {
+.modal-footer-container {
+  display: flex;
+  flex-direction: column;
   margin-top: 2rem;
+}
+
+.modal-footer {
   display: flex;
   justify-content: space-between;
   gap: 1rem;
+}
+
+.modal-hint {
+  text-align: center;
+  color: var(--color-text-light-2);
+  font-size: 0.8rem;
+  margin-top: 0.8rem;
 }
 
 .close-btn {
@@ -319,6 +331,45 @@
   color: var(--color-heading);
   background: var(--color-background-mute);
 }
+
+/* Динамический Textarea */
+.auto-resize-textarea {
+  overflow-y: auto;
+  max-height: 250px;
+  resize: none;
+}
+
+/* Выбор приоритета в виде кругов */
+.priority-selector {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  margin-top: 0.2rem;
+}
+
+.priority-circle {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  padding: 0;
+}
+
+.priority-circle:hover {
+  transform: scale(1.1);
+}
+
+.priority-circle.selected {
+  transform: scale(1.2);
+  border-color: var(--color-text);
+  box-shadow: 0 0 8px rgba(0, 0, 0, 0.15);
+}
+
+.priority-circle.high { background-color: #ef5350; }
+.priority-circle.medium { background-color: #ffca28; }
+.priority-circle.low { background-color: #66bb6a; }
 
 /* --- Список категорий --- */
 .category-list {

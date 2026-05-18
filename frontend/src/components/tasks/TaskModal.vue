@@ -1,6 +1,6 @@
 // frontend/src/components/tasks/TaskModal.vue
 <script setup lang="ts">
-import { ref, onMounted, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useTasksStore } from '@/stores/tasks'
 import type { Task } from '@/types'
 
@@ -16,44 +16,69 @@ const descInput = ref<HTMLTextAreaElement | null>(null)
 const formData = ref({
   description: '',
   category_id: '' as number | '',
-  due_at: '',
+  due_date: '',
+  due_time: '',
   priority: 'medium',
   status: 'pending',
   reminder_enabled: false,
-  reminder_minutes: 0
+  reminder_minutes: 0,
+  recurrence_rule: ''
 })
 
-// Функция для правильного конвертирования даты в локальное время инпута (YYYY-MM-DDTHH:mm)
-const getLocalISOTime = (dateInput: Date | string) => {
-  const date = new Date(dateInput)
-  if (isNaN(date.getTime())) return ''
-  const offset = date.getTimezoneOffset() * 60000
-  return (new Date(date.getTime() - offset)).toISOString().slice(0, 16)
+const handleEsc = (e: KeyboardEvent) => {
+  if (e.key === 'Escape') {
+    emit('close')
+  }
+}
+
+const adjustHeight = () => {
+  if (descInput.value) {
+    descInput.value.style.height = 'auto'
+    descInput.value.style.height = `${descInput.value.scrollHeight}px`
+  }
 }
 
 onMounted(async () => {
+  window.addEventListener('keydown', handleEsc)
+
   if (props.taskToEdit) {
     formData.value = {
       description: props.taskToEdit.description,
       category_id: props.taskToEdit.category_id || '',
-      // Конвертируем UTC время с сервера в локальное время для инпута
-      due_at: props.taskToEdit.due_at ? getLocalISOTime(props.taskToEdit.due_at) : '',
+      due_date: '',
+      due_time: '',
       priority: props.taskToEdit.priority,
       status: props.taskToEdit.status,
-      // Безопасное присвоение
       reminder_enabled: props.taskToEdit.reminder_enabled ?? false,
-      reminder_minutes: props.taskToEdit.reminder_minutes ?? 0
+      reminder_minutes: props.taskToEdit.reminder_minutes ?? 0,
+      recurrence_rule: props.taskToEdit.recurrence_rule || ''
+    }
+
+    if (props.taskToEdit.due_at) {
+      const d = new Date(props.taskToEdit.due_at)
+      const offset = d.getTimezoneOffset() * 60000
+      const localIso = new Date(d.getTime() - offset).toISOString()
+      formData.value.due_date = localIso.slice(0, 10)
+      formData.value.due_time = localIso.slice(11, 16)
     }
   } else {
-    // Подставляем текущее время (с учетом часового пояса устройства)
-    formData.value.due_at = getLocalISOTime(new Date())
+    // Подставляем текущую дату
+    const now = new Date()
+    const offset = now.getTimezoneOffset() * 60000
+    const localIso = new Date(now.getTime() - offset).toISOString()
+    formData.value.due_date = localIso.slice(0, 10)
+    formData.value.due_time = localIso.slice(11, 16)
   }
   
-  // Автофокус на поле ввода текста задачи
   await nextTick()
   if (descInput.value) {
     descInput.value.focus()
+    adjustHeight()
   }
+})
+
+onUnmounted(() => {
+  window.removeEventListener('keydown', handleEsc)
 })
 
 const saveTask = async () => {
@@ -61,10 +86,19 @@ const saveTask = async () => {
 
   const payload: any = { ...formData.value }
   if (payload.category_id === '') payload.category_id = null
-  if (payload.due_at === '') payload.due_at = null
-  else payload.due_at = new Date(payload.due_at).toISOString()
+  
+  if (payload.due_date) {
+    const timeStr = payload.due_time || '00:00'
+    payload.due_at = new Date(`${payload.due_date}T${timeStr}`).toISOString()
+  } else {
+    payload.due_at = null
+  }
+  
+  delete payload.due_date
+  delete payload.due_time
 
-  // Явное приведение типов перед отправкой на бэкенд
+  if (payload.recurrence_rule === '') payload.recurrence_rule = null
+
   payload.reminder_enabled = Boolean(payload.reminder_enabled)
   payload.reminder_minutes = Number(payload.reminder_minutes) || 0
 
@@ -93,7 +127,7 @@ const deleteTask = async () => {
     <div class="modal-content">
       <div class="modal-header">
         <h2>{{ taskToEdit ? 'Редактировать задачу' : 'Новая задача' }}</h2>
-        <button class="close-btn" @click="$emit('close')">&times;</button>
+        <button class="close-btn" @click="$emit('close')" title="Закрыть (Esc)">&times;</button>
       </div>
 
       <div class="modal-body">
@@ -102,15 +136,13 @@ const deleteTask = async () => {
           <textarea 
             ref="descInput"
             v-model="formData.description" 
-            class="form-control" 
-            rows="3" 
+            class="form-control auto-resize-textarea" 
+            rows="1" 
             required
+            @input="adjustHeight"
             @keydown.ctrl.enter="saveTask"
             @keydown.meta.enter="saveTask"
           ></textarea>
-          <small style="color: var(--color-text-light-2); font-size: 0.8rem; margin-top: 0.2rem; display: block;">
-            Ctrl+Enter для сохранения
-          </small>
         </div>
 
         <div class="filter-group">
@@ -125,16 +157,58 @@ const deleteTask = async () => {
 
         <div class="filter-group">
           <label>Срок выполнения</label>
-          <input type="datetime-local" v-model="formData.due_at" class="form-control" />
+          <div style="display: flex; gap: 0.5rem;">
+            <input 
+              type="date" 
+              v-model="formData.due_date" 
+              class="form-control" 
+              @click="$event.target.showPicker && $event.target.showPicker()"
+            />
+            <input 
+              type="time" 
+              v-model="formData.due_time" 
+              class="form-control"
+              @click="$event.target.showPicker && $event.target.showPicker()" 
+            />
+          </div>
+        </div>
+
+        <div class="filter-group">
+          <label>Повтор (Регулярность)</label>
+          <select v-model="formData.recurrence_rule" class="form-control">
+            <option value="">Без повтора</option>
+            <option value="FREQ=DAILY">Каждый день</option>
+            <option value="FREQ=WEEKLY">Каждую неделю</option>
+            <option value="FREQ=MONTHLY">Каждый месяц</option>
+            <option value="FREQ=YEARLY">Каждый год</option>
+          </select>
         </div>
 
         <div class="filter-group">
           <label>Приоритет</label>
-          <select v-model="formData.priority" class="form-control">
-            <option value="high">Высокий</option>
-            <option value="medium">Средний</option>
-            <option value="low">Низкий</option>
-          </select>
+          <div class="priority-selector">
+            <button 
+              type="button" 
+              class="priority-circle high" 
+              :class="{ selected: formData.priority === 'high' }" 
+              @click="formData.priority = 'high'" 
+              title="Высокий"
+            ></button>
+            <button 
+              type="button" 
+              class="priority-circle medium" 
+              :class="{ selected: formData.priority === 'medium' }" 
+              @click="formData.priority = 'medium'" 
+              title="Средний"
+            ></button>
+            <button 
+              type="button" 
+              class="priority-circle low" 
+              :class="{ selected: formData.priority === 'low' }" 
+              @click="formData.priority = 'low'" 
+              title="Низкий"
+            ></button>
+          </div>
         </div>
 
         <div class="filter-group">
@@ -150,16 +224,19 @@ const deleteTask = async () => {
         </div>
       </div>
 
-      <div class="modal-footer">
-        <div>
-          <button v-if="taskToEdit" class="btn btn-danger" style="width: auto; padding: 0.8rem;" @click="deleteTask" title="Удалить">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
-          </button>
+      <div class="modal-footer-container">
+        <div class="modal-footer">
+          <div>
+            <button v-if="taskToEdit" class="btn btn-danger" style="width: auto; padding: 0.8rem;" @click="deleteTask" title="Удалить">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+            </button>
+          </div>
+          <div style="display: flex; gap: 1rem;">
+            <button class="btn btn-secondary" style="width: auto;" @click="$emit('close')">Отмена</button>
+            <button class="btn btn-primary" style="width: auto;" @click="saveTask">Сохранить</button>
+          </div>
         </div>
-        <div style="display: flex; gap: 1rem;">
-          <button class="btn btn-secondary" style="width: auto;" @click="$emit('close')">Отмена</button>
-          <button class="btn btn-primary" style="width: auto;" @click="saveTask">Сохранить</button>
-        </div>
+        <div class="modal-hint">Ctrl+Enter для сохранения</div>
       </div>
     </div>
   </div>

@@ -7,10 +7,10 @@ from sqlalchemy import text
 
 from backend.config import settings
 from backend.auth import router as auth_router
-from backend.tasks import router as tasks_router
+from backend.tasks import router as tasks_router, run_daily_cron
 from backend.database import engine, Base
 
-# Импортируем функцию запуска бота и крон
+# Импортируем функцию запуска бота и крон напоминаний
 from backend.bot import start_bot, run_reminders
 
 @asynccontextmanager
@@ -36,6 +36,7 @@ async def lifespan(app: FastAPI):
                     "ai_provider VARCHAR DEFAULT 'gemini'",
                     "ai_api_key VARCHAR",
                     "task_hotkey VARCHAR DEFAULT 'ctrl+q'",
+                    "auto_postpone_overdue BOOLEAN DEFAULT FALSE",
                     "bot_token VARCHAR",
                     "groq_token VARCHAR",
                     "bot_name VARCHAR",
@@ -49,8 +50,9 @@ async def lifespan(app: FastAPI):
                     await conn.execute(text(f"ALTER TABLE users ADD COLUMN IF NOT EXISTS {col};"))
                 print("Миграция колонок для users успешно проверена.")
                 
-                # Миграция для новых полей задач (напоминания)
+                # Миграция для новых полей задач
                 task_cols = [
+                    "recurrence_rule VARCHAR",
                     "reminder_enabled BOOLEAN DEFAULT FALSE",
                     "reminder_minutes INTEGER DEFAULT 0",
                     "reminder_sent BOOLEAN DEFAULT FALSE"
@@ -65,15 +67,17 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         print(f"Ошибка при создании таблиц: {e}")
         
-    # 3. ЗАПУСК БОТА И КРОНА В ФОНЕ
+    # 3. ЗАПУСК БОТА И КРОНОВ В ФОНЕ
     bot_task = asyncio.create_task(start_bot())
     reminder_task = asyncio.create_task(run_reminders())
+    cron_task = asyncio.create_task(run_daily_cron())
         
     yield
     
     # 4. Грациозное завершение фоновых задач при остановке сервера
     bot_task.cancel()
     reminder_task.cancel()
+    cron_task.cancel()
 
 app = FastAPI(title="Jetplan API", lifespan=lifespan)
 

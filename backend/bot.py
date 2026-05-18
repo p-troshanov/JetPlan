@@ -24,8 +24,11 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 bot = Bot(token=TELEGRAM_BOT_TOKEN)
 dp = Dispatcher()
 
-# --- FSM State для редактирования задачи ---
+# --- FSM States ---
 class EditTaskState(StatesGroup):
+    waiting_for_text = State()
+
+class EditCategoryState(StatesGroup):
     waiting_for_text = State()
 
 def get_task_keyboard(task_id: int) -> InlineKeyboardMarkup:
@@ -103,21 +106,31 @@ async def cmd_start(message: types.Message, state: FSMContext):
         "введите ваш логин Telegram и нажмите 'Отправить код'."
     )
 
-async def process_user_message(message: types.Message, text: str, processing_msg: types.Message = None, update_task_id: int = None, state: FSMContext = None):
+async def process_user_message(message: types.Message, text: str, processing_msg: types.Message = None, update_task_id: int = None, state: FSMContext = None, user_telegram_id: int = None):
+    target_telegram_id = user_telegram_id or message.from_user.id
+    
     async with AsyncSessionLocal() as session:
         # Находим пользователя
         result = await session.execute(
-            select(UserProfile).where(UserProfile.telegram_id == message.from_user.id)
+            select(UserProfile).where(UserProfile.telegram_id == target_telegram_id)
         )
         user = result.scalar_one_or_none()
         
         if not user:
-            await message.answer("Сначала привяжите Telegram к вашему аккаунту JetPlan на сайте в разделе Настройки.")
+            msg_text = "Сначала привяжите Telegram к вашему аккаунту JetPlan на сайте в разделе Настройки."
+            if processing_msg:
+                await processing_msg.edit_text(msg_text)
+            else:
+                await message.answer(msg_text)
             if state: await state.clear()
             return
             
         if user.ai_provider != 'groq' or not user.ai_api_key:
-            await message.answer("Для умного добавления задач выберите провайдер Groq и укажите API ключ в настройках сайта.")
+            msg_text = "Для умного добавления задач выберите провайдер Groq и укажите API ключ в настройках сайта."
+            if processing_msg:
+                await processing_msg.edit_text(msg_text)
+            else:
+                await message.answer(msg_text)
             if state: await state.clear()
             return
 
@@ -163,19 +176,25 @@ async def process_user_message(message: types.Message, text: str, processing_msg
 Существующие категории пользователя:
 {categories_str}
 
+ОПРЕДЕЛЕНИЕ ДЕЙСТВИЯ (action_type):
+- "category": Если пользователь явно просит создать или добавить новую категорию (например, "добавь категорию Покупки", "создай список Фильмы").
+- "task": Если это явно задача (есть глагол действия, сроки, или это стандартная задача типа "купить молоко", "сделать отчет").
+- "unknown": Если пользователь написал одно короткое слово или фразу без контекста (например, просто "Ремонт" или "Покупки") и непонятно, хочет он создать задачу с таким текстом или новую категорию.
+
 Правила заполнения полей:
-1. category_id: Подбери ID категории, которая лучше всего подходит по смыслу. Для идей/мыслей обязательно используй ID ({idea_cat.id}). Если подходящей категории нет, верни null.
-2. priority: Определи приоритет ("low", "medium", "high").
-3. due_at: Если в тексте указан срок выполнения, дедлайн или дата (например, "завтра в 15:00", "в пятницу", "через час"), вычисли точную дату на основе текущей и верни в формате ISO 8601 ("YYYY-MM-DDTHH:MM:SS"). Если время дня явно не указано, используй 00:00:00. Если дата не подразумевается, верни null.
-4. reminder_enabled: Если пользователь просит напомнить (например "напомни за 10 минут", "поставь напоминалку"), установи true. Если нет - false.
-5. reminder_minutes: За сколько минут до `due_at` нужно прислать напоминание. Например, "напомни за час" -> 60, "напомни за день" -> 1440. По умолчанию 0. Если reminder_enabled=false, верни 0.
+1. category_name: Если action_type="category", извлеки название категории (сделай его с заглавной буквы). В противном случае верни null.
+2. category_id: Подбери ID категории, которая лучше всего подходит по смыслу для задачи. Для идей/мыслей обязательно используй ID ({idea_cat.id}). Если подходящей категории нет, верни null.
+3. priority: Определи приоритет ("low", "medium", "high").
+4. due_at: Если в тексте указан срок выполнения, дедлайн или дата, вычисли точную дату на основе текущей и верни в формате ISO 8601 ("YYYY-MM-DDTHH:MM:SS"). Если время дня явно не указано, используй 00:00:00. Если дата не подразумевается, верни null.
+5. reminder_enabled: Если пользователь просит напомнить (например "напомни за 10 минут", "поставь напоминалку"), установи true. Если нет - false.
+6. reminder_minutes: За сколько минут до `due_at` нужно прислать напоминание. По умолчанию 0. Если reminder_enabled=false, верни 0.
 
 ВАЖНЫЕ ПРАВИЛА ДЛЯ ПОЛЯ DESCRIPTION (ТЕКСТ ЗАДАЧИ):
-1. ОЧИСТКА ОТ МЕТАДАННЫХ: Строго удаляй из итогового текста любые упоминания времени, дат, приоритетов, названий категорий и вводные слова (например: "на завтра", "в категорию разработка", "создай задачу", "напомни"). В description должна попасть ТОЛЬКО сама суть действия.
-2. ФОРМАТИРОВАНИЕ: Исправляй опечатки в оставшемся тексте, расставляй знаки препинания и всегда начинай с заглавной буквы.
+1. ОЧИСТКА: Строго удаляй из итогового текста любые упоминания времени, дат, приоритетов, названий категорий и вводные слова (например: "на завтра", "в категорию разработка", "создай задачу", "напомни").
+2. ФОРМАТИРОВАНИЕ: Исправляй опечатки и всегда начинай с заглавной буквы.
 """
 
-        # Дополняем промпт в зависимости от режима (Создание или Редактирование)
+        # Дополняем промпт в зависимости от режима
         if existing_task:
             local_due_at_str = 'null'
             if existing_task.due_at:
@@ -194,27 +213,18 @@ async def process_user_message(message: types.Message, text: str, processing_msg
 - Напоминание включено: {str(existing_task.reminder_enabled).lower()}
 - Минуты напоминания: {existing_task.reminder_minutes}
 
-Твоя задача: проанализировать запрос пользователя (например "добавить время 21:00", "сделай срочным" или "допиши: купить молоко") и применить эти изменения к текущим данным.
-- Обязательно верни полный JSON со всеми полями!
-- Для полей, которые пользователь НЕ просит менять, СКОПИРУЙ их текущие значения из списка выше. 
-- НЕ используй null для поля, если у него есть текущее значение (кроме случаев, когда пользователь явно просит убрать дату или категорию).
-- Для description: если пользователь просит дополнить/дописать текст, добавь это к текущему описанию. Если просит полностью переписать - замени. Если меняет только дату/приоритет - скопируй текущее описание.
-- Свойство create_task верни true.
-"""
-        else:
-            system_prompt += """
-РЕЖИМ СОЗДАНИЯ ЗАДАЧИ:
-Твоя задача: проанализировать текст и понять, нужно ли создать задачу или записать идею.
-Триггеры для создания: "создай задачу", "запиши задачу", "запиши идею", "напомни", "добавь" и т.п., либо если текст сам по себе содержит мысль/идею/задачу для сохранения.
-Если пользователь просто здоровается или общается не по делу, верни create_task: false.
-По умолчанию приоритет "medium".
+Твоя задача: проанализировать запрос пользователя и применить изменения к текущим данным.
+- Свойство action_type всегда верни "task".
+- Для полей, которые пользователь НЕ просит менять, СКОПИРУЙ их текущие значения. 
+- Для description: если пользователь просит дополнить/дописать текст, добавь это к текущему описанию. Если меняет только дату/приоритет - скопируй текущее описание.
 """
 
         system_prompt += """
 Ответ должен быть СТРОГО в формате JSON:
 {
-  "create_task": true или false,
-  "description": "Только суть задачи (очищенная от дат/категорий), исправленная и с заглавной буквы",
+  "action_type": "task", "category" или "unknown",
+  "category_name": "Имя новой категории с заглавной буквы (только если action_type = category), иначе null",
+  "description": "Только суть задачи (для action_type = task)",
   "category_id": число или null,
   "priority": "low" | "medium" | "high",
   "due_at": "YYYY-MM-DDTHH:MM:SS" или null,
@@ -251,7 +261,47 @@ async def process_user_message(message: types.Message, text: str, processing_msg
             ai_content = res['choices'][0]['message']['content']
             task_data = json.loads(ai_content)
             
-            if task_data.get('create_task'):
+            action_type = task_data.get('action_type')
+            
+            # Фолбэк на случай старой модели, если она проигнорировала инструкцию
+            if not action_type and 'create_task' in task_data:
+                action_type = 'task' if task_data.get('create_task') else 'unknown'
+
+            if action_type == 'category':
+                cat_name = task_data.get('category_name') or text
+                cat_name = cat_name.strip().capitalize()
+                
+                existing_cat = next((c for c in categories if c.name.lower() == cat_name.lower()), None)
+                if existing_cat:
+                    await processing_msg.edit_text(f"Категория <b>{existing_cat.name}</b> уже существует.", parse_mode="HTML")
+                else:
+                    new_cat = TaskCategory(user_id=user.id, name=cat_name, category_type="custom")
+                    session.add(new_cat)
+                    await session.commit()
+                    await session.refresh(new_cat)
+                    
+                    kb = InlineKeyboardMarkup(inline_keyboard=[[
+                        InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_category:{new_cat.id}")
+                    ]])
+                    await processing_msg.edit_text(f"📁 Создана новая категория: <b>{new_cat.name}</b>", parse_mode="HTML", reply_markup=kb)
+                
+                if state: await state.clear()
+                return
+
+            elif action_type == 'unknown':
+                await state.update_data(pending_text=text)
+                kb = InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="📝 Задачу", callback_data="clarify:task"),
+                    InlineKeyboardButton(text="📁 Категорию", callback_data="clarify:category")
+                ]])
+                await processing_msg.edit_text(
+                    f"Я не уверен, что именно вы хотите добавить.\n\nТекст: <i>{text}</i>\n\nВыберите действие:",
+                    parse_mode="HTML",
+                    reply_markup=kb
+                )
+                return
+
+            elif action_type == 'task':
                 # 1. Безопасный парсинг due_at
                 raw_due_at = task_data.get('due_at')
                 due_at_val = existing_task.due_at if existing_task else None
@@ -272,7 +322,7 @@ async def process_user_message(message: types.Message, text: str, processing_msg
                     local_midnight = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
                     due_at_val = local_midnight.astimezone(timezone.utc)
                 
-                # 2. Безопасный парсинг настроек напоминания (устойчивость к null)
+                # 2. Безопасный парсинг настроек напоминания
                 raw_rem_enabled = task_data.get('reminder_enabled')
                 rem_enabled = bool(raw_rem_enabled) if raw_rem_enabled is not None else (existing_task.reminder_enabled if existing_task else False)
                 
@@ -295,21 +345,19 @@ async def process_user_message(message: types.Message, text: str, processing_msg
                 pri_val = raw_pri if raw_pri else (existing_task.priority if existing_task else 'medium')
 
                 if existing_task:
-                    # Применяем изменения к существующей задаче (теперь 100% безопасно)
                     existing_task.description = desc_val
                     existing_task.category_id = cat_val
                     existing_task.priority = pri_val
                     existing_task.due_at = due_at_val
                     existing_task.reminder_enabled = rem_enabled
                     existing_task.reminder_minutes = rem_mins
-                    existing_task.reminder_sent = False # Сбрасываем флаг напоминания при любом изменении
+                    existing_task.reminder_sent = False
                     
                     new_task = existing_task
                     await session.commit()
                     await session.refresh(new_task)
                     prefix_action = "🔄 Задача обновлена"
                 else:
-                    # Создаем новую задачу
                     idx_res = await session.execute(select(func.max(Task.order_index)).where(Task.user_id == user.id))
                     max_order = idx_res.scalar() or 0
                     
@@ -339,8 +387,13 @@ async def process_user_message(message: types.Message, text: str, processing_msg
                 priority_emojis = {'high': '🔴', 'medium': '🟡', 'low': '🟢'}
                 emoji = priority_emojis.get(new_task.priority, '⚪')
                 
-                # Добавляем инфо о напоминании в ответ пользователю
-                rem_text = f", напомнить за {new_task.reminder_minutes} мин." if new_task.reminder_enabled else ""
+                if new_task.reminder_enabled:
+                    if new_task.reminder_minutes == 0:
+                        rem_text = ", напоминание в то же время"
+                    else:
+                        rem_text = f", напомнить за {new_task.reminder_minutes} мин."
+                else:
+                    rem_text = ""
                     
                 if existing_task:
                     reply_text = (
@@ -359,7 +412,7 @@ async def process_user_message(message: types.Message, text: str, processing_msg
                 if state:
                     await state.clear()
             else:
-                msg = "Я не распознал команду для сохранения задачи. Напишите 'создай задачу: ...' или отправьте голосовое."
+                msg = "Я не распознал команду. Напишите задачу или команду для создания категории."
                 await processing_msg.edit_text(msg)
                 if state:
                     await state.clear()
@@ -369,6 +422,84 @@ async def process_user_message(message: types.Message, text: str, processing_msg
             await processing_msg.edit_text("Произошла ошибка при обработке вашего запроса.")
             if state:
                 await state.clear()
+
+@dp.callback_query(F.data.startswith("clarify:"))
+async def process_clarification(callback: CallbackQuery, state: FSMContext):
+    choice = callback.data.split(":")[1]
+    data = await state.get_data()
+    text = data.get("pending_text")
+    
+    if not text:
+        await callback.answer("Данные устарели", show_alert=True)
+        return
+        
+    await state.clear()
+    
+    if choice == 'category':
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(
+                select(UserProfile).where(UserProfile.telegram_id == callback.from_user.id)
+            )
+            user = result.scalar_one_or_none()
+            
+            cat_name = text.strip().capitalize()
+            
+            cats_result = await session.execute(select(TaskCategory).where(TaskCategory.user_id == user.id))
+            categories = cats_result.scalars().all()
+            existing_cat = next((c for c in categories if c.name.lower() == cat_name.lower()), None)
+            
+            if existing_cat:
+                await callback.message.edit_text(f"Категория <b>{existing_cat.name}</b> уже существует.", parse_mode="HTML")
+            else:
+                new_cat = TaskCategory(user_id=user.id, name=cat_name, category_type="custom")
+                session.add(new_cat)
+                await session.commit()
+                await session.refresh(new_cat)
+                
+                kb = InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_category:{new_cat.id}")
+                ]])
+                await callback.message.edit_text(f"📁 Создана новая категория: <b>{new_cat.name}</b>", parse_mode="HTML", reply_markup=kb)
+    else:
+        # Если пользователь выбрал задачу
+        await callback.message.edit_text("🤖 <i>Создаю задачу...</i>", parse_mode="HTML")
+        forced_text = f"Создай задачу: {text}"
+        await process_user_message(
+            message=callback.message, 
+            text=forced_text, 
+            processing_msg=callback.message, 
+            state=state,
+            user_telegram_id=callback.from_user.id
+        )
+
+# --- Обработчик редактирования текста категории ---
+@dp.message(EditCategoryState.waiting_for_text)
+async def handle_category_edit_text(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    cat_id = data.get("update_category_id")
+    if not cat_id:
+        await state.clear()
+        return
+        
+    new_name = message.text.strip().capitalize()
+    
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(
+            select(TaskCategory).where(TaskCategory.id == cat_id)
+        )
+        cat = result.scalar_one_or_none()
+        if cat:
+            cat.name = new_name
+            await session.commit()
+            
+            kb = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="✏️ Редактировать", callback_data=f"edit_category:{cat.id}")
+            ]])
+            await message.answer(f"✅ Название категории обновлено: <b>{cat.name}</b>", parse_mode="HTML", reply_markup=kb)
+        else:
+            await message.answer("Категория не найдена.")
+            
+    await state.clear()
 
 @dp.message(F.text)
 async def handle_text(message: types.Message, state: FSMContext):
@@ -423,7 +554,7 @@ async def handle_voice(message: types.Message, state: FSMContext):
             if state: await state.clear()
             return
             
-        await processing_msg.edit_text(f"🗣 <i>Распознано:</i> {text}\n🤖 <i>Анализирую задачу...</i>", parse_mode="HTML")
+        await processing_msg.edit_text(f"🗣 <i>Распознано:</i> {text}\n🤖 <i>Анализирую...</i>", parse_mode="HTML")
         
         state_data = await state.get_data()
         update_task_id = state_data.get("update_task_id")
@@ -435,7 +566,23 @@ async def handle_voice(message: types.Message, state: FSMContext):
         await processing_msg.edit_text("Ошибка при обработке голосового сообщения.")
         if state: await state.clear()
 
-# --- Callback Handlers для кнопок задач ---
+# --- Callback Handlers для кнопок задач и категорий ---
+@dp.callback_query(F.data.startswith("edit_category:"))
+async def process_edit_category(callback: CallbackQuery, state: FSMContext):
+    cat_id = int(callback.data.split(":")[1])
+    await state.update_data(update_category_id=cat_id)
+    await state.set_state(EditCategoryState.waiting_for_text)
+    
+    cancel_kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="❌ Отменить", callback_data="cancel_edit")]
+    ])
+    
+    await callback.message.reply(
+        "✏️ Введите новое название категории:",
+        reply_markup=cancel_kb
+    )
+    await callback.answer()
+
 @dp.callback_query(F.data.startswith("delete_task:"))
 async def process_delete_task(callback: CallbackQuery):
     task_id = int(callback.data.split(":")[1])
@@ -474,6 +621,46 @@ async def process_cancel_edit(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text("❌ Редактирование отменено.")
     await callback.answer()
 
+@dp.callback_query(F.data.startswith("complete:"))
+async def process_complete_task(callback: CallbackQuery):
+    task_id = int(callback.data.split(":")[1])
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+        if task:
+            task.status = 'completed'
+            await session.commit()
+            await callback.message.edit_text(f"✅ Задача выполнена:\n<s>{task.description}</s>", parse_mode="HTML")
+        else:
+            await callback.answer("Задача не найдена", show_alert=True)
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("delay:"))
+async def process_delay_task(callback: CallbackQuery):
+    parts = callback.data.split(":")
+    task_id = int(parts[1])
+    minutes = int(parts[2])
+    
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(Task).where(Task.id == task_id))
+        task = result.scalar_one_or_none()
+        if task:
+            if not task.due_at.tzinfo:
+                task.due_at = task.due_at.replace(tzinfo=timezone.utc)
+            
+            task.due_at += timedelta(minutes=minutes)
+            task.reminder_sent = False # Сбрасываем флаг, чтобы напоминание снова сработало
+            await session.commit()
+            
+            new_time_str = format_date_ru(task.due_at)
+            await callback.message.edit_text(
+                f"⏳ Отложено на {minutes} мин (до {new_time_str})\n<i>{task.description}</i>",
+                parse_mode="HTML"
+            )
+        else:
+            await callback.answer("Задача не найдена", show_alert=True)
+    await callback.answer()
+
 # Экспортируемый воркер для проверки напоминаний
 async def run_reminders():
     logging.info("Фоновый процесс проверки напоминаний запущен.")
@@ -502,14 +689,23 @@ async def run_reminders():
                     if now >= remind_time:
                         if user.telegram_id:
                             try:
-                                due_str = format_date_ru(task_time)
-                                priority_emojis = {'high': '🔴', 'medium': '🟡', 'low': '🟢'}
-                                emoji = priority_emojis.get(task.priority, '⚪')
+                                # Клавиатура с кнопками для выполнения и откладывания
+                                kb = InlineKeyboardMarkup(inline_keyboard=[
+                                    [
+                                        InlineKeyboardButton(text="⏳ +15 мин", callback_data=f"delay:{task.id}:15"),
+                                        InlineKeyboardButton(text="⏳ +30 мин", callback_data=f"delay:{task.id}:30"),
+                                        InlineKeyboardButton(text="⏳ +1 час", callback_data=f"delay:{task.id}:60")
+                                    ],
+                                    [
+                                        InlineKeyboardButton(text="✅ Выполнено", callback_data=f"complete:{task.id}")
+                                    ]
+                                ])
                                 
                                 await bot.send_message(
                                     user.telegram_id,
-                                    f"🔔 <b>Напоминание о задаче!</b>\n\n✅На {due_str}, приоритет: {emoji}\n\n{task.description}",
-                                    parse_mode="HTML"
+                                    f"🔔 <b>Напоминание</b>\n{task.description}",
+                                    parse_mode="HTML",
+                                    reply_markup=kb
                                 )
                             except Exception as e:
                                 logging.error(f"Failed to send reminder to {user.telegram_id}: {e}")
@@ -531,4 +727,3 @@ async def start_bot():
         
     logging.info("Запуск Telegram бота в фоновом режиме...")
     await dp.start_polling(bot)
-

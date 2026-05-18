@@ -1,2 +1,13 @@
 # requirements.txt
-fastapi==0.1
+fastapi
+uvicorn
+python-dotenv
+sqlalchemy
+asyncpg
+aiohttp
+aiogram
+python-jose[cryptography]
+python-multipart
+passlib
+bcrypt
+python-dateutil

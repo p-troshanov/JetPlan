@@ -20,4 +20,5 @@ export interface Task {
   category?: Category;
   reminder_enabled?: boolean;
   reminder_minutes?: number;
+  recurrence_rule?: string;
 }
