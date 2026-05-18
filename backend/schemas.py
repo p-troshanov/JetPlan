@@ -48,6 +48,9 @@ class TelegramRequestCodeRequest(BaseModel):
 
 class TelegramVerifyCodeRequest(BaseModel):
     code: str
+    
+class InteractiveAuthRequest(BaseModel):
+    username: str
 
 # --- Task Category Schemas ---
 class TaskCategoryBase(BaseModel):

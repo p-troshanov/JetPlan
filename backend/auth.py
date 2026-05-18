@@ -3,6 +3,7 @@ import hashlib
 import hmac
 import random
 import string
+import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from jose import JWTError, jwt
@@ -15,13 +16,14 @@ from pydantic import BaseModel
 import bcrypt
 
 from backend.config import settings
-from backend.database import get_db, UserProfile, TaskCategory, TelegramLinkCode, TelegramUserCache
+from backend.database import get_db, UserProfile, TaskCategory, TelegramLinkCode, TelegramUserCache, TelegramAuthRequest
 from backend.schemas import (
     UserProfileUpdate, UserProfileResponse, ChangePasswordRequest,
     TelegramBotCodeRequest, TelegramBotCodeResponse, TelegramLinkCodeRequest,
-    TelegramRequestCodeRequest, TelegramVerifyCodeRequest
+    TelegramRequestCodeRequest, TelegramVerifyCodeRequest, InteractiveAuthRequest
 )
 from backend.bot import bot
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 SECRET_KEY = settings.SECRET_KEY
 ALGORITHM = "HS256"
@@ -167,6 +169,95 @@ async def telegram_auth(data: TelegramAuthData, db: AsyncSession = Depends(get_d
         data={"sub": str(user.id)}, expires_delta=access_token_expires
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+# --- Интерактивный Telegram Вход через бота ---
+@router.post("/telegram-interactive/request")
+async def interactive_auth_request(data: InteractiveAuthRequest, db: AsyncSession = Depends(get_db)):
+    username = data.username.replace("@", "").lower().strip()
+    if not username:
+        raise HTTPException(status_code=400, detail="Укажите корректный логин")
+        
+    result = await db.execute(select(TelegramUserCache).where(func.lower(TelegramUserCache.username) == username))
+    cache = result.scalar_one_or_none()
+    
+    if not cache:
+        raise HTTPException(status_code=400, detail="Бот вас не знает. Напишите /start в бота @jetplan_bot, а затем повторите попытку.")
+
+    req_id = str(uuid.uuid4())
+    expires = datetime.now(timezone.utc) + timedelta(minutes=5)
+    
+    auth_req = TelegramAuthRequest(
+        request_id=req_id, 
+        telegram_id=cache.telegram_id, 
+        expires_at=expires
+    )
+    db.add(auth_req)
+    await db.commit()
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="✅ Разрешить вход", callback_data=f"auth_approve:{req_id}")],
+        [InlineKeyboardButton(text="❌ Запретить", callback_data=f"auth_deny:{req_id}")]
+    ])
+    
+    try:
+        await bot.send_message(
+            chat_id=cache.telegram_id,
+            text="🚨 <b>Попытка входа/регистрации</b>\nКто-то пытается зайти в ваш аккаунт JetPlan на сайте. Разрешить?",
+            parse_mode="HTML",
+            reply_markup=kb
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail="Ошибка отправки сообщения ботом. Убедитесь, что вы не заблокировали бота.")
+        
+    return {"request_id": req_id}
+
+@router.get("/telegram-interactive/status")
+async def interactive_auth_status(request_id: str, db: AsyncSession = Depends(get_db)):
+    result = await db.execute(select(TelegramAuthRequest).where(TelegramAuthRequest.request_id == request_id))
+    auth_req = result.scalar_one_or_none()
+    
+    if not auth_req:
+        raise HTTPException(status_code=404, detail="Запрос не найден")
+    
+    if auth_req.expires_at < datetime.now(timezone.utc):
+        return {"status": "expired"}
+
+    if auth_req.status == "approved":
+        res_user = await db.execute(select(UserProfile).where(UserProfile.telegram_id == auth_req.telegram_id))
+        user = res_user.scalar_one_or_none()
+        
+        if not user:
+            c_res = await db.execute(select(TelegramUserCache).where(TelegramUserCache.telegram_id == auth_req.telegram_id))
+            cache = c_res.scalar_one_or_none()
+            
+            user = UserProfile(
+                telegram_id=auth_req.telegram_id,
+                username=cache.username if cache else None,
+                first_name=cache.first_name if cache else None,
+                last_name=cache.last_name if cache else None,
+                user_info=f"Вход через Telegram (@{cache.username if cache else 'unknown'})"
+            )
+            db.add(user)
+            await db.commit()
+            await db.refresh(user)
+            
+            default_cat = TaskCategory(user_id=user.id, name="Личное", category_type="default")
+            db.add(default_cat)
+            await db.commit()
+        
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": str(user.id)}, expires_delta=access_token_expires
+        )
+        
+        await db.delete(auth_req)
+        await db.commit()
+        
+        return {"status": "approved", "access_token": access_token}
+
+    return {"status": auth_req.status}
+
 
 async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_db)):
     credentials_exception = HTTPException(

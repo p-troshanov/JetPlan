@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from sqlalchemy.future import select
 from sqlalchemy import func
 
-from backend.database import AsyncSessionLocal, TelegramUserCache, UserProfile, TaskCategory, Task
+from backend.database import AsyncSessionLocal, TelegramUserCache, UserProfile, TaskCategory, Task, TelegramAuthRequest
 
 load_dotenv()
 
@@ -567,6 +567,35 @@ async def handle_voice(message: types.Message, state: FSMContext):
         if state: await state.clear()
 
 # --- Callback Handlers для кнопок задач и категорий ---
+
+@dp.callback_query(F.data.startswith("auth_approve:"))
+async def process_auth_approve(callback: CallbackQuery):
+    req_id = callback.data.split(":")[1]
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(TelegramAuthRequest).where(TelegramAuthRequest.request_id == req_id))
+        auth_req = result.scalar_one_or_none()
+        if auth_req and auth_req.status == "pending":
+            auth_req.status = "approved"
+            await session.commit()
+            await callback.message.edit_text("✅ Вход разрешен. Возвращайтесь на сайт.")
+        else:
+            await callback.message.edit_text("Запрос устарел, уже обработан или отменен.")
+    await callback.answer()
+
+@dp.callback_query(F.data.startswith("auth_deny:"))
+async def process_auth_deny(callback: CallbackQuery):
+    req_id = callback.data.split(":")[1]
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(TelegramAuthRequest).where(TelegramAuthRequest.request_id == req_id))
+        auth_req = result.scalar_one_or_none()
+        if auth_req and auth_req.status == "pending":
+            auth_req.status = "denied"
+            await session.commit()
+            await callback.message.edit_text("❌ Вход отклонен.")
+        else:
+            await callback.message.edit_text("Запрос устарел или уже обработан.")
+    await callback.answer()
+
 @dp.callback_query(F.data.startswith("edit_category:"))
 async def process_edit_category(callback: CallbackQuery, state: FSMContext):
     cat_id = int(callback.data.split(":")[1])

@@ -55,6 +55,14 @@ class TelegramLinkCode(Base):
     username: Mapped[str] = mapped_column(String, nullable=True)
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
 
+class TelegramAuthRequest(Base):
+    __tablename__ = "telegram_auth_requests"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    request_id: Mapped[str] = mapped_column(String, unique=True, index=True)
+    telegram_id: Mapped[int] = mapped_column(BigInteger)
+    status: Mapped[str] = mapped_column(String, default="pending")
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
 class TelegramUserCache(Base):
     __tablename__ = "telegram_user_cache"
     telegram_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)

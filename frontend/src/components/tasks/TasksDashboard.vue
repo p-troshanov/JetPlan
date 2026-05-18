@@ -37,6 +37,34 @@ const selectedStatus = ref('pending')
 // Интервал фонового обновления
 let pollInterval: ReturnType<typeof setInterval> | undefined
 
+// Состояние развернутых текстов задач
+const expandedTasks = ref<Set<number>>(new Set())
+
+const toggleTaskText = (taskId: number) => {
+  const newSet = new Set(expandedTasks.value)
+  if (newSet.has(taskId)) {
+    newSet.delete(taskId)
+  } else {
+    newSet.add(taskId)
+  }
+  expandedTasks.value = newSet
+}
+
+// Генерация стилей категории для темной темы
+const getCategoryStyle = (str: string) => {
+  let hash = 0
+  for (let i = 0; i < str.length; i++) {
+    hash = str.charCodeAt(i) + ((hash << 5) - hash)
+  }
+  const hue = Math.abs(hash) % 360
+  
+  return {
+    color: `hsl(${hue}, 80%, 75%)`,
+    backgroundColor: `hsla(${hue}, 80%, 75%, 0.1)`,
+    borderColor: `hsla(${hue}, 80%, 75%, 0.3)`
+  }
+}
+
 const syncOnFocus = () => {
   if (!showTaskModal.value && !showCatModal.value) {
     store.fetchTasks(true) // фоновая загрузка, чтобы UI не мигал
@@ -357,9 +385,19 @@ const getPriorityLabel = (priority: string) => {
                 {{ getPriorityIcon(task.priority) }}
               </span>
             </div>
-            <div class="task-text">{{ task.description }}</div>
+            
+            <div class="task-text-container">
+              <div class="task-text">
+                {{ expandedTasks.has(task.id) || task.description.length <= 80 ? task.description : task.description.slice(0, 150) + '...' }}
+              </div>
+              <span v-if="task.description.length > 80" class="expand-text-btn" @click.stop="toggleTaskText(task.id)">
+                <svg v-if="!expandedTasks.has(task.id)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+                <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
+              </span>
+            </div>
+
             <div>
-              <span v-if="task.category" class="category-badge">{{ task.category.name }}</span>
+              <span v-if="task.category" class="category-badge" :style="getCategoryStyle(task.category.name)">{{ task.category.name }}</span>
               <span v-else class="category-badge" style="opacity: 0.5">—</span>
             </div>
             <div class="task-actions">

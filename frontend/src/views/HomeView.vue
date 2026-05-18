@@ -1,9 +1,8 @@
 // frontend/src/views/HomeView.vue
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import TasksDashboard from '../components/tasks/TasksDashboard.vue'
-import TelegramLogin from '../components/TelegramLogin.vue'
 
 const router = useRouter()
 const isAuthenticated = ref(false)
@@ -15,10 +14,20 @@ const username = ref('')
 const password = ref('')
 const errorMessage = ref('')
 
+// Состояния для интерактивной авторизации Telegram
+const tgUsername = ref('')
+const authRequestId = ref('')
+const tgAuthStatus = ref('')
+let tgPollInterval: any = null
+
 onMounted(() => {
   if (userToken.value) {
     isAuthenticated.value = true
   }
+})
+
+onUnmounted(() => {
+  if (tgPollInterval) clearInterval(tgPollInterval)
 })
 
 // Авторизация по логину/паролю
@@ -75,29 +84,69 @@ const handleRegister = async () => {
   }
 };
 
-// Авторизация через Telegram
-const handleTelegramAuth = async (user: any) => {
+// Интерактивный Telegram вход
+const requestTelegramInteractiveAuth = async () => {
   errorMessage.value = '';
+  tgAuthStatus.value = '';
+  
+  if (!tgUsername.value) {
+    errorMessage.value = 'Введите логин Telegram';
+    return;
+  }
+
   try {
-    const response = await fetch('/api/auth/telegram', {
+    const response = await fetch('/api/auth/telegram-interactive/request', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(user),
+      body: JSON.stringify({ username: tgUsername.value }),
     });
 
     if (response.ok) {
       const data = await response.json();
-      localStorage.setItem('access_token', data.access_token);
-      userToken.value = data.access_token;
-      isAuthenticated.value = true;
+      authRequestId.value = data.request_id;
+      tgAuthStatus.value = 'Ожидаем подтверждения... Откройте бота @jetplan_bot и нажмите "Разрешить вход".';
+      
+      tgPollInterval = setInterval(pollTelegramAuthStatus, 2000);
     } else {
-      errorMessage.value = 'Не удалось подтвердить авторизацию через Telegram.';
+      const data = await response.json();
+      errorMessage.value = data.detail || 'Ошибка при запросе входа';
     }
   } catch (error) {
-    console.error("Fetch error [telegram]:", error);
-    errorMessage.value = 'Ошибка соединения с сервером (см. консоль)';
+    console.error("Fetch error [tg-interactive]:", error);
+    errorMessage.value = 'Ошибка соединения с сервером';
+  }
+};
+
+const pollTelegramAuthStatus = async () => {
+  if (!authRequestId.value) return;
+
+  try {
+    const response = await fetch(`/api/auth/telegram-interactive/status?request_id=${authRequestId.value}`);
+    if (response.ok) {
+      const data = await response.json();
+      if (data.status === 'approved') {
+        clearInterval(tgPollInterval);
+        localStorage.setItem('access_token', data.access_token);
+        userToken.value = data.access_token;
+        isAuthenticated.value = true;
+        authRequestId.value = '';
+        tgAuthStatus.value = '';
+      } else if (data.status === 'denied') {
+        clearInterval(tgPollInterval);
+        errorMessage.value = 'Вход был отклонен в боте.';
+        authRequestId.value = '';
+        tgAuthStatus.value = '';
+      } else if (data.status === 'expired') {
+        clearInterval(tgPollInterval);
+        errorMessage.value = 'Время ожидания вышло. Попробуйте снова.';
+        authRequestId.value = '';
+        tgAuthStatus.value = '';
+      }
+    }
+  } catch (err) {
+    console.error("Polling error", err);
   }
 };
 
@@ -105,6 +154,7 @@ const logout = () => {
   localStorage.removeItem('access_token');
   userToken.value = '';
   isAuthenticated.value = false;
+  if (tgPollInterval) clearInterval(tgPollInterval);
 };
 </script>
 
@@ -135,11 +185,18 @@ const logout = () => {
       </form>
 
       <div v-if="authMode === 'telegram'" class="telegram-section">
-        <TelegramLogin 
-          botName="jetplan_bot" 
-          @callback="handleTelegramAuth" 
-        />
-        <p class="hint">Убедитесь, что используете протокол HTTPS или localhost</p>
+        <form v-if="!authRequestId" @submit.prevent="requestTelegramInteractiveAuth" class="auth-form">
+          <input type="text" v-model="tgUsername" placeholder="Ваш логин (например, @durov)" required />
+          <button type="submit" class="primary-btn">Отправить запрос боту</button>
+        </form>
+        
+        <div v-else class="polling-status">
+          <div class="spinner"></div>
+          <p>{{ tgAuthStatus }}</p>
+          <button @click="() => { clearInterval(tgPollInterval); authRequestId = ''; }" class="btn-cancel">Отмена</button>
+        </div>
+        
+        <p class="hint" v-if="!authRequestId">Бот пришлет вам сообщение с кнопкой подтверждения. Вы должны хотя бы раз нажать /start в боте перед этим.</p>
       </div>
     </div>
     
@@ -258,6 +315,36 @@ const logout = () => {
   font-size: 0.8rem;
   color: var(--color-text-light-2);
   margin-top: 1rem;
+}
+
+.polling-status {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.spinner {
+  width: 30px;
+  height: 30px;
+  border: 3px solid rgba(0,0,0,0.1);
+  border-radius: 50%;
+  border-top-color: hsla(160, 100%, 37%, 1);
+  animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.btn-cancel {
+  background: transparent;
+  border: none;
+  color: var(--color-text-light-2);
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.9rem;
 }
 
 .header-controls {
