@@ -8,11 +8,31 @@ export interface UserProfile {
   username: string;
   first_name?: string;
   last_name?: string;
-  ai_provider?: string;
-  ai_api_key?: string;
+  ai_provider?: 'groq' | 'openrouter';
+  ai_model?: string | null;
+  ai_api_key_configured: boolean;
+  stt_provider?: 'groq';
+  stt_api_key_configured: boolean;
   task_hotkey?: string;
   auto_postpone_overdue?: boolean;
   telegram_id?: number;
+}
+
+export interface UserProfileUpdate {
+  first_name?: string;
+  last_name?: string;
+  ai_provider?: 'groq' | 'openrouter';
+  ai_api_key?: string;
+  ai_model?: string | null;
+  stt_provider?: 'groq';
+  stt_api_key?: string;
+  task_hotkey?: string;
+  auto_postpone_overdue?: boolean;
+}
+
+interface ProfileUpdateResult {
+  ok: boolean;
+  error?: string;
 }
 
 export const useUserStore = defineStore('user', () => {
@@ -40,7 +60,7 @@ export const useUserStore = defineStore('user', () => {
     }
   }
 
-  const updateProfile = async (data: Partial<UserProfile>) => {
+  const updateProfile = async (data: UserProfileUpdate): Promise<ProfileUpdateResult> => {
     try {
       const res = await fetch('/api/auth/me', {
         method: 'PUT',
@@ -49,12 +69,14 @@ export const useUserStore = defineStore('user', () => {
       })
       if (res.ok) {
         profile.value = await res.json()
-        return true
+        return { ok: true }
       }
+      const body = await res.json().catch(() => null)
+      return { ok: false, error: body?.detail || 'Не удалось сохранить настройки' }
     } catch (err) {
       console.error('Error updating profile:', err)
+      return { ok: false, error: 'Сервер недоступен. Повторите позже.' }
     }
-    return false
   }
 
   return { profile, fetchProfile, updateProfile, getHeaders }

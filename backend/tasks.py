@@ -1,7 +1,5 @@
 # backend/tasks.py
 # Предоставляет API задач и категорий, AI-действия и фоновую обработку просроченных задач.
-import aiohttp
-import json
 import asyncio
 from datetime import datetime, timezone
 from dateutil.rrule import rrulestr
@@ -12,6 +10,7 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy import func, delete
 from typing import List
 
+from backend.ai import AIProviderError, AISettingsError, complete_json, log_provider_error
 from backend.database import get_db, AsyncSessionLocal, Task, TaskCategory, UserProfile
 from backend.auth import get_current_user
 from backend.access_control import require_owned_task_category
@@ -224,9 +223,6 @@ async def process_ai_action(
     db: AsyncSession = Depends(get_db), 
     current_user: UserProfile = Depends(get_current_user)
 ):
-    if current_user.ai_provider != 'groq' or not current_user.ai_api_key:
-        raise HTTPException(status_code=400, detail="Для использования ИИ необходимо указать API ключ Groq в настройках.")
-
     cats = await db.execute(select(TaskCategory).where(TaskCategory.user_id == current_user.id))
     categories = cats.scalars().all()
     cats_info = ", ".join([f"'{c.name}' (ID: {c.id})" for c in categories])
@@ -267,33 +263,21 @@ async def process_ai_action(
 
 Ответ должен быть СТРОГО в формате JSON. Не пиши ничего кроме JSON.
 """
-    url = "https://api.groq.com/openai/v1/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {current_user.ai_api_key}",
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": "llama-3.3-70b-versatile",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": data.query}
-        ],
-        "response_format": {"type": "json_object"},
-        "temperature": 0.1
-    }
-
-    async with aiohttp.ClientSession() as session:
-        async with session.post(url, headers=headers, json=payload) as resp:
-            if resp.status != 200:
-                err_text = await resp.text()
-                raise HTTPException(status_code=500, detail=f"Ошибка API Groq: {err_text}")
-            res_json = await resp.json()
-
-    ai_content = res_json['choices'][0]['message']['content']
     try:
-        parsed = json.loads(ai_content)
-    except Exception:
-        raise HTTPException(status_code=500, detail="Неверный формат ответа от ИИ")
+        parsed = await complete_json(
+            provider=current_user.ai_provider,
+            api_key=current_user.ai_api_key,
+            model=current_user.ai_model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": data.query},
+            ],
+        )
+    except AISettingsError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except AIProviderError as exc:
+        log_provider_error(exc, "web_task_query", current_user.ai_model)
+        raise HTTPException(status_code=exc.http_status, detail=exc.user_message) from exc
 
     intent = parsed.get("intent")
     message = parsed.get("message", "Выполнено")

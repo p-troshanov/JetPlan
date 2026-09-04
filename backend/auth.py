@@ -14,6 +14,7 @@ from sqlalchemy import delete, func
 from pydantic import BaseModel
 import bcrypt
 
+from backend.ai import AISettingsError, validate_ai_selection, validate_stt_selection
 from backend.config import settings
 from backend.database import get_db, UserProfile, TaskCategory, TelegramLinkCode, TelegramUserCache, TelegramAuthRequest
 from backend.schemas import (
@@ -286,9 +287,25 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession
 
 # --- Эндпоинты профиля пользователя ---
 
+def serialize_user_profile(user: UserProfile) -> dict:
+    return {
+        "id": user.id,
+        "username": user.username,
+        "first_name": user.first_name,
+        "last_name": user.last_name,
+        "ai_provider": user.ai_provider,
+        "ai_model": user.ai_model,
+        "ai_api_key_configured": bool(user.ai_api_key),
+        "stt_provider": user.stt_provider,
+        "stt_api_key_configured": bool(user.stt_api_key),
+        "task_hotkey": user.task_hotkey,
+        "auto_postpone_overdue": bool(user.auto_postpone_overdue),
+        "telegram_id": user.telegram_id,
+    }
+
 @router.get("/me", response_model=UserProfileResponse)
 async def get_me(current_user: UserProfile = Depends(get_current_user)):
-    return current_user
+    return serialize_user_profile(current_user)
 
 @router.put("/me", response_model=UserProfileResponse)
 async def update_me(
@@ -297,12 +314,27 @@ async def update_me(
     current_user: UserProfile = Depends(get_current_user)
 ):
     update_data = data.model_dump(exclude_unset=True)
+    prospective_provider = update_data.get("ai_provider", current_user.ai_provider or "groq")
+    prospective_model = update_data.get("ai_model", current_user.ai_model)
+    prospective_stt_provider = update_data.get("stt_provider", current_user.stt_provider or "groq")
+    try:
+        normalized_provider, normalized_model = validate_ai_selection(
+            prospective_provider,
+            prospective_model,
+        )
+        normalized_stt_provider = validate_stt_selection(prospective_stt_provider)
+    except AISettingsError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    update_data["ai_provider"] = normalized_provider
+    update_data["ai_model"] = normalized_model
+    update_data["stt_provider"] = normalized_stt_provider
     for key, value in update_data.items():
         setattr(current_user, key, value)
     db.add(current_user)
     await db.commit()
     await db.refresh(current_user)
-    return current_user
+    return serialize_user_profile(current_user)
 
 @router.put("/password")
 async def change_password(

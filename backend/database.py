@@ -1,4 +1,5 @@
 # backend/database.py
+# Описывает ORM-модели JetPlan и создаёт асинхронные сессии PostgreSQL.
 from datetime import datetime
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.orm import declarative_base, Mapped, mapped_column, relationship
@@ -30,8 +31,11 @@ class UserProfile(Base):
     # Новые поля для настроек пользователя
     first_name: Mapped[str] = mapped_column(String, nullable=True)
     last_name: Mapped[str] = mapped_column(String, nullable=True)
-    ai_provider: Mapped[str] = mapped_column(String, default="gemini")
+    ai_provider: Mapped[str] = mapped_column(String, default="groq", server_default="groq")
     ai_api_key: Mapped[str] = mapped_column(String, nullable=True)
+    ai_model: Mapped[str] = mapped_column(String, nullable=True)
+    stt_provider: Mapped[str] = mapped_column(String, default="groq", server_default="groq")
+    stt_api_key: Mapped[str] = mapped_column(String, nullable=True)
     task_hotkey: Mapped[str] = mapped_column(String, default="ctrl+q")
     auto_postpone_overdue: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     

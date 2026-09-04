@@ -1,9 +1,9 @@
 <!-- frontend/src/views/SettingsView.vue -->
 <!-- Показывает профиль, настройки приложения, смену пароля и безопасную привязку Telegram. -->
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { useUserStore } from '@/stores/user'
+import { useUserStore, type UserProfileUpdate } from '@/stores/user'
 
 const router = useRouter()
 const userStore = useUserStore()
@@ -11,8 +11,11 @@ const userStore = useUserStore()
 const formData = ref({
   first_name: '',
   last_name: '',
-  ai_provider: 'gemini',
+  ai_provider: 'groq' as 'groq' | 'openrouter',
   ai_api_key: '',
+  ai_model: '',
+  stt_provider: 'groq' as const,
+  stt_api_key: '',
   task_hotkey: 'ctrl+q',
   auto_postpone_overdue: false
 })
@@ -28,13 +31,31 @@ const codeSent = ref(false)
 const message = ref('')
 const isError = ref(false)
 
+const aiProviderName = computed(() => (
+  formData.value.ai_provider === 'openrouter' ? 'OpenRouter' : 'Groq'
+))
+
+const aiKeyPlaceholder = computed(() => (
+  userStore.profile?.ai_api_key_configured
+    ? 'Ключ сохранён, оставьте поле пустым'
+    : `API-ключ ${aiProviderName.value}`
+))
+
+const sttKeyPlaceholder = computed(() => (
+  userStore.profile?.stt_api_key_configured
+    ? 'Ключ Groq Whisper сохранён'
+    : 'API-ключ Groq для Whisper'
+))
+
 onMounted(async () => {
   await userStore.fetchProfile()
   if (userStore.profile) {
     formData.value.first_name = userStore.profile.first_name || ''
     formData.value.last_name = userStore.profile.last_name || ''
-    formData.value.ai_provider = userStore.profile.ai_provider || 'gemini'
-    formData.value.ai_api_key = userStore.profile.ai_api_key || ''
+    formData.value.ai_provider = userStore.profile.ai_provider || 'groq'
+    formData.value.ai_api_key = ''
+    formData.value.ai_model = userStore.profile.ai_model || ''
+    formData.value.stt_api_key = ''
     formData.value.task_hotkey = userStore.profile.task_hotkey || 'ctrl+q'
     formData.value.auto_postpone_overdue = userStore.profile.auto_postpone_overdue || false
   }
@@ -47,11 +68,25 @@ const showMessage = (msg: string, error = false) => {
 }
 
 const saveProfile = async () => {
-  const success = await userStore.updateProfile(formData.value)
-  if (success) {
+  const payload: UserProfileUpdate = {
+    first_name: formData.value.first_name,
+    last_name: formData.value.last_name,
+    ai_provider: formData.value.ai_provider,
+    ai_model: formData.value.ai_provider === 'openrouter' ? formData.value.ai_model.trim() : null,
+    stt_provider: 'groq',
+    task_hotkey: formData.value.task_hotkey,
+    auto_postpone_overdue: formData.value.auto_postpone_overdue,
+  }
+  if (formData.value.ai_api_key.trim()) payload.ai_api_key = formData.value.ai_api_key.trim()
+  if (formData.value.stt_api_key.trim()) payload.stt_api_key = formData.value.stt_api_key.trim()
+
+  const result = await userStore.updateProfile(payload)
+  if (result.ok) {
+    formData.value.ai_api_key = ''
+    formData.value.stt_api_key = ''
     showMessage('Настройки сохранены')
   } else {
-    showMessage('Ошибка при сохранении', true)
+    showMessage(result.error || 'Ошибка при сохранении', true)
   }
 }
 
@@ -148,18 +183,70 @@ const verifyTelegramCode = async () => {
 
       <section class="settings-section">
         <h3>Нейросеть</h3>
+        <p class="section-description">Используется для текстовых команд на сайте и в Telegram.</p>
         <div class="settings-form-grid">
           <label>Провайдер</label>
           <select v-model="formData.ai_provider" class="form-control">
-            <option value="gemini">Gemini Flash</option>
             <option value="groq">Groq</option>
+            <option value="openrouter">OpenRouter</option>
           </select>
+
+          <label v-if="formData.ai_provider === 'openrouter'">ID модели</label>
+          <div v-if="formData.ai_provider === 'openrouter'">
+            <input
+              type="text"
+              v-model="formData.ai_model"
+              class="form-control"
+              placeholder="anthropic/claude-sonnet-4.5"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <small class="hint">Точный ID из каталога OpenRouter в формате provider/model.</small>
+          </div>
           
-          <label>API Ключ</label>
-          <input type="password" v-model="formData.ai_api_key" class="form-control" placeholder="sk-..." />
+          <label>API-ключ</label>
+          <div>
+            <input
+              type="password"
+              v-model="formData.ai_api_key"
+              class="form-control"
+              :placeholder="aiKeyPlaceholder"
+              autocomplete="new-password"
+              spellcheck="false"
+            />
+            <small v-if="userStore.profile?.ai_api_key_configured" class="credential-status">Ключ сохранён</small>
+          </div>
           
           <div></div>
           <button class="btn btn-primary btn-auto" @click="saveProfile">Сохранить нейросеть</button>
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Голосовой ввод Telegram</h3>
+        <p class="section-description">Whisper распознаёт речь отдельно, затем текст обрабатывает выбранная выше нейросеть.</p>
+        <div class="settings-form-grid">
+          <label>Распознавание</label>
+          <select v-model="formData.stt_provider" class="form-control" disabled>
+            <option value="groq">Groq Whisper Large V3</option>
+          </select>
+
+          <label>API-ключ Whisper</label>
+          <div>
+            <input
+              type="password"
+              v-model="formData.stt_api_key"
+              class="form-control"
+              :placeholder="sttKeyPlaceholder"
+              autocomplete="new-password"
+              spellcheck="false"
+            />
+            <small v-if="userStore.profile?.stt_api_key_configured" class="credential-status">Ключ распознавания сохранён</small>
+            <small v-else class="hint">Можно использовать тот же Groq API-ключ, что и для текстовых запросов.</small>
+          </div>
+
+          <div></div>
+          <button class="btn btn-primary btn-auto" @click="saveProfile">Сохранить голосовой ввод</button>
         </div>
       </section>
 
@@ -290,6 +377,13 @@ const verifyTelegramCode = async () => {
   font-weight: 600;
 }
 
+.section-description {
+  max-width: 65ch;
+  margin: -0.8rem 0 1.5rem;
+  color: var(--color-text-light-2);
+  line-height: 1.5;
+}
+
 .settings-form-grid {
   display: grid;
   grid-template-columns: 200px 1fr;
@@ -360,6 +454,14 @@ const verifyTelegramCode = async () => {
   margin-top: 0.3rem;
   font-size: 0.8rem;
   color: var(--color-text-light-2);
+}
+
+.credential-status {
+  display: block;
+  margin-top: 0.35rem;
+  color: hsla(160, 100%, 32%, 1);
+  font-size: 0.8rem;
+  font-weight: 600;
 }
 
 .tg-link {

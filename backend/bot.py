@@ -2,10 +2,8 @@
 # Обрабатывает Telegram-команды, AI-ввод задач, callback-действия и доставку напоминаний.
 import logging
 import os
-import json
 import asyncio
 from io import BytesIO
-import aiohttp
 from datetime import datetime, timezone, timedelta
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters.command import Command
@@ -16,6 +14,14 @@ from dotenv import load_dotenv
 from sqlalchemy.future import select
 from sqlalchemy import func
 
+from backend.ai import (
+    AIProviderError,
+    AISettingsError,
+    complete_json,
+    log_provider_error,
+    transcribe_audio,
+    validate_ai_selection,
+)
 from backend.database import AsyncSessionLocal, TelegramUserCache, UserProfile, TaskCategory, Task, TelegramAuthRequest
 
 load_dotenv()
@@ -126,8 +132,19 @@ async def process_user_message(message: types.Message, text: str, processing_msg
             if state: await state.clear()
             return
             
-        if user.ai_provider != 'groq' or not user.ai_api_key:
-            msg_text = "Для умного добавления задач выберите провайдер Groq и укажите API ключ в настройках сайта."
+        try:
+            validate_ai_selection(user.ai_provider, user.ai_model)
+        except AISettingsError as exc:
+            msg_text = str(exc)
+            if processing_msg:
+                await processing_msg.edit_text(msg_text)
+            else:
+                await message.answer(msg_text)
+            if state: await state.clear()
+            return
+
+        if not user.ai_api_key:
+            msg_text = "Для умного добавления задач укажите API-ключ выбранного AI-провайдера в настройках сайта."
             if processing_msg:
                 await processing_msg.edit_text(msg_text)
             else:
@@ -235,34 +252,16 @@ async def process_user_message(message: types.Message, text: str, processing_msg
   "reminder_minutes": число
 }
 """
-        url = "https://api.groq.com/openai/v1/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {user.ai_api_key}",
-            "Content-Type": "application/json"
-        }
-        payload = {
-            "model": "llama-3.3-70b-versatile",
-            "messages": [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": text}
-            ],
-            "response_format": {"type": "json_object"},
-            "temperature": 0.1
-        }
-
         try:
-            async with aiohttp.ClientSession() as http_session:
-                async with http_session.post(url, headers=headers, json=payload) as resp:
-                    if resp.status != 200:
-                        err_text = await resp.text()
-                        logging.error(f"Groq API Error: {err_text}")
-                        await processing_msg.edit_text("Произошла ошибка при обращении к Groq API. Проверьте логи сервера.")
-                        if state: await state.clear()
-                        return
-                    res = await resp.json()
-                    
-            ai_content = res['choices'][0]['message']['content']
-            task_data = json.loads(ai_content)
+            task_data = await complete_json(
+                provider=user.ai_provider,
+                api_key=user.ai_api_key,
+                model=user.ai_model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": text},
+                ],
+            )
             
             action_type = task_data.get('action_type')
             
@@ -429,9 +428,18 @@ async def process_user_message(message: types.Message, text: str, processing_msg
                 if state:
                     await state.clear()
 
-        except Exception as e:
-            logging.error(f"Error processing AI task: {e}")
-            await processing_msg.edit_text("Произошла ошибка при обработке вашего запроса.")
+        except AISettingsError as exc:
+            await processing_msg.edit_text(str(exc))
+            if state:
+                await state.clear()
+        except AIProviderError as exc:
+            log_provider_error(exc, "telegram_task", user.ai_model)
+            await processing_msg.edit_text(exc.user_message)
+            if state:
+                await state.clear()
+        except Exception:
+            logging.exception("Telegram AI result processing failed")
+            await processing_msg.edit_text("Не удалось применить ответ AI к задаче. Повторите запрос.")
             if state:
                 await state.clear()
 
@@ -529,8 +537,8 @@ async def handle_voice(message: types.Message, state: FSMContext):
         )
         user = result.scalar_one_or_none()
         
-        if not user or user.ai_provider != 'groq' or not user.ai_api_key:
-            await message.answer("Для голосового ввода привяжите Telegram и укажите API ключ Groq в настройках сайта.")
+        if not user:
+            await message.answer("Для голосового ввода сначала привяжите Telegram к аккаунту JetPlan.")
             if state: await state.clear()
             return
             
@@ -542,29 +550,12 @@ async def handle_voice(message: types.Message, state: FSMContext):
     await bot.download_file(file.file_path, file_bytes)
     file_bytes.seek(0)
             
-    url = "https://api.groq.com/openai/v1/audio/transcriptions"
-    headers = {"Authorization": f"Bearer {user.ai_api_key}"}
-    
-    data = aiohttp.FormData()
-    data.add_field('file', file_bytes.read(), filename='voice.ogg', content_type='audio/ogg')
-    data.add_field('model', 'whisper-large-v3')
-    
     try:
-        async with aiohttp.ClientSession() as http_session:
-            async with http_session.post(url, headers=headers, data=data) as resp:
-                if resp.status != 200:
-                    err_txt = await resp.text()
-                    logging.error(f"Whisper Error: {err_txt}")
-                    await processing_msg.edit_text("Ошибка при распознавании голоса Groq Whisper API.")
-                    if state: await state.clear()
-                    return
-                res = await resp.json()
-                text = res.get("text", "")
-                
-        if not text.strip():
-            await processing_msg.edit_text("Не удалось распознать речь (пустой ответ).")
-            if state: await state.clear()
-            return
+        text = await transcribe_audio(
+            provider=user.stt_provider,
+            api_key=user.stt_api_key,
+            audio_bytes=file_bytes.read(),
+        )
             
         await processing_msg.edit_text(f"🗣 <i>Распознано:</i> {text}\n🤖 <i>Анализирую...</i>", parse_mode="HTML")
         
@@ -573,8 +564,15 @@ async def handle_voice(message: types.Message, state: FSMContext):
         
         await process_user_message(message, text, processing_msg=processing_msg, update_task_id=update_task_id, state=state)
         
-    except Exception as e:
-        logging.error(f"Voice processing error: {e}")
+    except AISettingsError as exc:
+        await processing_msg.edit_text(str(exc))
+        if state: await state.clear()
+    except AIProviderError as exc:
+        log_provider_error(exc, "telegram_voice_transcription")
+        await processing_msg.edit_text(exc.user_message)
+        if state: await state.clear()
+    except Exception:
+        logging.exception("Telegram voice processing failed")
         await processing_msg.edit_text("Ошибка при обработке голосового сообщения.")
         if state: await state.clear()
 

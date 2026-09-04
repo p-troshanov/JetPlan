@@ -1,17 +1,25 @@
 # backend/schemas.py
 # Определяет проверяемые request/response-контракты пользователей, Telegram, категорий и задач.
-from pydantic import BaseModel, ConfigDict, Field
-from typing import Optional, List
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import Literal, Optional, List
 from datetime import datetime
 
 # --- User Profile Schemas ---
 class UserProfileUpdate(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
-    ai_provider: Optional[str] = None
-    ai_api_key: Optional[str] = None
+    ai_provider: Optional[Literal["groq", "openrouter"]] = None
+    ai_api_key: Optional[str] = Field(default=None, max_length=512)
+    ai_model: Optional[str] = Field(default=None, max_length=160)
+    stt_provider: Optional[Literal["groq"]] = None
+    stt_api_key: Optional[str] = Field(default=None, max_length=512)
     task_hotkey: Optional[str] = None
     auto_postpone_overdue: Optional[bool] = None
+
+    @field_validator("ai_api_key", "ai_model", "stt_api_key")
+    @classmethod
+    def normalize_optional_text(cls, value: Optional[str]) -> Optional[str]:
+        return value.strip() if value and value.strip() else None
 
 class UserProfileResponse(BaseModel):
     id: int
@@ -19,7 +27,10 @@ class UserProfileResponse(BaseModel):
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     ai_provider: Optional[str] = None
-    ai_api_key: Optional[str] = None
+    ai_model: Optional[str] = None
+    ai_api_key_configured: bool = False
+    stt_provider: Optional[str] = None
+    stt_api_key_configured: bool = False
     task_hotkey: Optional[str] = None
     auto_postpone_overdue: bool = False
     telegram_id: Optional[int] = None

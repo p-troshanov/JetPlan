@@ -5,6 +5,7 @@ import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useTasksStore } from '@/stores/tasks'
 import type { Task } from '@/types'
 import { TASK_PRIORITIES } from '@/utils/taskPlanning'
+import CategoryCombobox from '@/components/tasks/CategoryCombobox.vue'
 
 const props = defineProps<{
   taskToEdit?: Task | null
@@ -156,12 +157,7 @@ const deleteTask = async () => {
 
         <div class="filter-group">
           <label>Категория</label>
-          <select v-model="formData.category_id" class="form-control">
-            <option value="">Без категории</option>
-            <option v-for="cat in store.categories" :key="cat.id" :value="cat.id">
-              {{ cat.name }}
-            </option>
-          </select>
+          <CategoryCombobox v-model="formData.category_id" :categories="store.categories" />
         </div>
 
         <div class="filter-group">

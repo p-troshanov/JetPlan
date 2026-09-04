@@ -3,6 +3,54 @@
 Последние 25 завершённых задач, в которых изменялся код проекта.
 Новые записи располагаются сверху.
 
+## 2026-09-04 — Поиск категорий и provider-neutral AI-контур
+
+**Работали над:** поиском категории в форме задачи, восстановлением диагностируемого Groq-пути, OpenRouter и независимым Telegram voice STT.
+
+**Изменения:**
+- обычный category select заменён доступным searchable combobox для создания и редактирования, с поиском по названию/подкатегории, клавиатурным выбором и явным вариантом «Без категории»;
+- Groq и OpenRouter подключены через единый адаптер с общим timeout, JSON parsing и безопасной классификацией provider errors;
+- настройки сохраняют обязательный OpenRouter model ID, больше не предлагают неподдерживаемый Gemini и не возвращают API-ключи в profile response;
+- Telegram voice использует отдельный Groq Whisper credential, а распознанный текст передаёт выбранному Groq или OpenRouter;
+- добавлен файловый migration runner и миграция AI/STT-полей с сохранением голосового ввода существующим Groq-пользователям;
+- добавлены contract/profile/Telegram voice tests и документация support matrix.
+
+**Файлы:**
+- `backend/ai.py`
+- `backend/auth.py`
+- `backend/bot.py`
+- `backend/database.py`
+- `backend/main.py`
+- `backend/migrations/__init__.py`
+- `backend/migrations/runner.py`
+- `backend/migrations/001_provider_neutral_ai.sql`
+- `backend/schemas.py`
+- `backend/tasks.py`
+- `frontend/src/components/tasks/CategoryCombobox.vue`
+- `frontend/src/components/tasks/TaskModal.vue`
+- `frontend/src/utils/categorySearch.ts`
+- `frontend/src/assets/tasks.css`
+- `frontend/src/stores/user.ts`
+- `frontend/src/views/SettingsView.vue`
+- `frontend/tests/categorySearch.test.ts`
+- `tests/test_ai.py`
+- `tests/test_ai_profile.py`
+- `tests/test_bot_voice.py`
+- `docs/integrations/ai-providers.md`
+- `backlog.md`
+- `devlog.md`
+
+**Проверки:**
+- `venv\\Scripts\\python.exe -m unittest discover -s tests -v` — 21 из 21 успешно;
+- Python `compileall` и `pip check` — успешно;
+- frontend `node --test tests/*.test.ts` — 8 из 8 успешно;
+- `vue-tsc --build` и Vite production build — успешно;
+- Docker build checks backend/frontend — успешно, предупреждений Dockerfile нет;
+- `docker compose config --quiet` — синтаксически успешно, остаётся прежнее предупреждение об устаревшем поле `version`.
+
+**Ограничения:**
+- endpoint и модель Groq сверены с официальной документацией, mock-контракты кода проверены, но внешний health-check с сохранённым пользовательским ключом не выполнялся без отдельного явного разрешения на использование credential; в доступном хвосте server logs ошибок Groq нет.
+
 ## 2026-09-04 — Канбан задач: приоритет, категория и недельная дата
 
 **Работали над:** всеми тремя канбан-задачами из backlog и общим состоянием фильтров списка/доски.

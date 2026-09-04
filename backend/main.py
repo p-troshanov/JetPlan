@@ -1,4 +1,5 @@
 # backend/main.py
+# Собирает FastAPI-приложение, применяет миграции и управляет фоновыми процессами.
 import asyncio
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -9,6 +10,7 @@ from backend.config import settings
 from backend.auth import router as auth_router
 from backend.tasks import router as tasks_router, run_daily_cron
 from backend.database import engine, Base
+from backend.migrations import run_migrations
 
 # Импортируем функцию запуска бота и крон напоминаний
 from backend.bot import start_bot, run_reminders
@@ -66,6 +68,12 @@ async def lifespan(app: FastAPI):
         print("Таблицы успешно проверены/созданы.")
     except Exception as e:
         print(f"Ошибка при создании таблиц: {e}")
+
+    # Файловые миграции являются обязательными: при ошибке приложение не должно
+    # запускаться со старым profile contract и падать уже на пользовательских запросах.
+    applied_migrations = await run_migrations(engine)
+    if applied_migrations:
+        print(f"Применены миграции: {', '.join(applied_migrations)}")
         
     # 3. ЗАПУСК БОТА И КРОНОВ В ФОНЕ
     bot_task = asyncio.create_task(start_bot())
