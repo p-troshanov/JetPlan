@@ -22,9 +22,10 @@ const editingTask = ref<Task | null>(null)
 // Видимость блока фильтров
 const showFilters = ref(false)
 
-// AI Поиск
-const aiQuery = ref('')
-const isAiLoading = ref(false)
+// Локальный поиск по уже загруженным задачам
+const searchQuery = ref('')
+const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLocaleLowerCase('ru-RU'))
+const isSearchActive = computed(() => normalizedSearchQuery.value.length > 0)
 
 // Фильтры и сортировка
 const isManualSort = ref(false)
@@ -125,30 +126,42 @@ const handleGlobalKeydown = (e: KeyboardEvent) => {
   }
 }
 
-const handleAiQuery = async () => {
-  if (!aiQuery.value.trim()) return
-  isAiLoading.value = true
-  try {
-    const localTime = new Date().toLocaleString('ru-RU')
-    const response = await store.sendAiQuery(aiQuery.value, localTime)
-    
-    if (response.action === 'reload') {
-      await store.fetchTasks()
-      alert(response.message || 'Действие выполнено')
-      aiQuery.value = ''
-    } else if (response.action === 'filter') {
-      showFilters.value = true
-      const f = response.filters || {}
-      selectedStatus.value = f.status || 'all'
-      selectedPriority.value = f.priority || ''
-      selectedCategoryId.value = f.category_id ?? ''
-      showOnlyOverdue.value = !!f.is_overdue
-    }
-  } catch (err: any) {
-    alert(err.message || 'Ошибка обработки AI запроса')
-  } finally {
-    isAiLoading.value = false
+type TextSegment = {
+  text: string
+  isMatch: boolean
+}
+
+const getVisibleTaskDescription = (task: Task) => {
+  if (isSearchActive.value || expandedTasks.value.has(task.id) || task.description.length <= 80) {
+    return task.description
   }
+
+  return `${task.description.slice(0, 150)}...`
+}
+
+const getHighlightedSegments = (text: string): TextSegment[] => {
+  const query = searchQuery.value.trim()
+  if (!query) return [{ text, isMatch: false }]
+
+  const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const matcher = new RegExp(escapedQuery, 'giu')
+  const segments: TextSegment[] = []
+  let lastIndex = 0
+
+  for (const match of text.matchAll(matcher)) {
+    const matchIndex = match.index ?? 0
+    if (matchIndex > lastIndex) {
+      segments.push({ text: text.slice(lastIndex, matchIndex), isMatch: false })
+    }
+    segments.push({ text: match[0], isMatch: true })
+    lastIndex = matchIndex + match[0].length
+  }
+
+  if (lastIndex < text.length) {
+    segments.push({ text: text.slice(lastIndex), isMatch: false })
+  }
+
+  return segments.length > 0 ? segments : [{ text, isMatch: false }]
 }
 
 const priorityWeight: Record<string, number> = { high: 3, medium: 2, low: 1 }
@@ -189,6 +202,12 @@ const filteredAndSortedTasks = computed(() => {
   
   if (selectedStatus.value !== 'all') {
     result = result.filter(t => t.status === selectedStatus.value)
+  }
+
+  if (normalizedSearchQuery.value) {
+    result = result.filter(t => (
+      t.description.toLocaleLowerCase('ru-RU').includes(normalizedSearchQuery.value)
+    ))
   }
 
   if (isManualSort.value && !showOnlyOverdue.value) {
@@ -276,11 +295,41 @@ const getPriorityLabel = (priority: string) => {
           <span class="btn-text">+ Создать задачу</span>
         </button>
         
-        <div class="ai-search-bar" style="display: flex; gap: 0.5rem; flex: 1; max-width: 400px; margin-left: 1rem;">
-          <input type="text" v-model="aiQuery" @keyup.enter="handleAiQuery" class="form-control" placeholder="✨ AI: 'покажи просроченные'..." :disabled="isAiLoading" />
-          <button class="btn btn-secondary" @click="handleAiQuery" :disabled="isAiLoading">
-            <span v-if="isAiLoading">...</span>
-            <span v-else>✨</span>
+        <div class="task-search" role="search">
+          <svg class="task-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+            <circle cx="11" cy="11" r="8"></circle>
+            <path d="m21 21-4.35-4.35"></path>
+          </svg>
+          <input
+            v-model="searchQuery"
+            type="search"
+            class="task-search-input"
+            placeholder="Поиск по задачам"
+            aria-label="Поиск по задачам"
+            autocomplete="off"
+            spellcheck="false"
+            @keydown.esc="searchQuery = ''"
+          />
+          <span
+            v-if="isSearchActive"
+            class="task-search-count"
+            :aria-label="`Найдено задач: ${filteredAndSortedTasks.length}`"
+            aria-live="polite"
+          >
+            {{ filteredAndSortedTasks.length }}
+          </span>
+          <button
+            v-if="isSearchActive"
+            type="button"
+            class="task-search-clear"
+            aria-label="Очистить поиск"
+            title="Очистить поиск"
+            @click="searchQuery = ''"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
+              <path d="M18 6 6 18"></path>
+              <path d="m6 6 12 12"></path>
+            </svg>
           </button>
         </div>
 
@@ -360,8 +409,13 @@ const getPriorityLabel = (priority: string) => {
 
       <div v-if="store.isLoading" style="text-align: center; padding: 2rem;">Загрузка...</div>
       
-      <div v-else-if="filteredAndSortedTasks.length === 0" style="text-align: center; padding: 2rem; color: var(--color-text-light-2);">
-        Задач не найдено
+      <div v-else-if="filteredAndSortedTasks.length === 0" class="tasks-empty-state">
+        <template v-if="isSearchActive">
+          <strong>Совпадений не найдено</strong>
+          <span>Измените запрос или активные фильтры.</span>
+          <button type="button" class="empty-state-reset" @click="searchQuery = ''">Очистить поиск</button>
+        </template>
+        <span v-else>Задач не найдено</span>
       </div>
 
       <draggable
@@ -391,9 +445,15 @@ const getPriorityLabel = (priority: string) => {
             
             <div class="task-text-container">
               <div class="task-text">
-                {{ expandedTasks.has(task.id) || task.description.length <= 80 ? task.description : task.description.slice(0, 150) + '...' }}
+                <template
+                  v-for="(segment, index) in getHighlightedSegments(getVisibleTaskDescription(task))"
+                  :key="`${task.id}-${index}`"
+                >
+                  <mark v-if="segment.isMatch" class="search-match">{{ segment.text }}</mark>
+                  <template v-else>{{ segment.text }}</template>
+                </template>
               </div>
-              <span v-if="task.description.length > 80" class="expand-text-btn" @click.stop="toggleTaskText(task.id)">
+              <span v-if="task.description.length > 80 && !isSearchActive" class="expand-text-btn" @click.stop="toggleTaskText(task.id)">
                 <svg v-if="!expandedTasks.has(task.id)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                 <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
               </span>
