@@ -58,6 +58,11 @@
   - Где: `backend/main.py`, `docker-compose.yml`, deployment healthcheck.
   - Следующий шаг: завершать startup при критической ошибке БД, проверять DB readiness в health endpoint, добавить healthchecks и зависимости по состоянию здоровья.
 
+- [ ] Исключить публичный 502 после пересоздания frontend при деплое
+  - Контекст: deploy `00cbf5a` пересоздал `frontend`, но оставил `nginx` в состоянии `up-to-date`; reverse proxy сохранил старый upstream-адрес, поэтому `/health` и `/settings` отвечали 502 до ручного `podman compose restart nginx`, тогда как `/api/health` оставался доступен.
+  - Где: `C:/PYTHON/deploy_jetplan.sh`, серверный `/home/pasha/deploy_jetplan.sh`, `docker-compose.yml`, nginx upstream resolution.
+  - Следующий шаг: гарантированно перезапускать или пересоздавать nginx после backend/frontend и завершать deploy только после публичных smoke-проверок `/health`, `/api/health` и прямого SPA route.
+
 - [ ] Заменить runtime-DDL полноценными файловыми миграциями
   - Контекст: `create_all` и набор `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` не контролируют версии схемы, constraints и rollback; серверная схема может отличаться от свежей установки.
   - Где: `backend/main.py`, `backend/database.py`, отсутствующий migrations-контур.
