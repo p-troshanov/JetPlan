@@ -6,10 +6,13 @@ import { useTasksStore } from '@/stores/tasks'
 import { useUserStore } from '@/stores/user'
 import draggable from 'vuedraggable'
 import type { Task } from '@/types'
+import { TASK_PRIORITIES, filterTasks } from '@/utils/taskPlanning'
 import '@/assets/tasks.css'
 
 import TaskModal from './TaskModal.vue'
 import CategoryModal from './CategoryModal.vue'
+import TaskFiltersPanel from './TaskFiltersPanel.vue'
+import TaskSearch from './TaskSearch.vue'
 
 const store = useTasksStore()
 const userStore = useUserStore()
@@ -22,19 +25,11 @@ const editingTask = ref<Task | null>(null)
 // Видимость блока фильтров
 const showFilters = ref(false)
 
-// Локальный поиск по уже загруженным задачам
-const searchQuery = ref('')
-const normalizedSearchQuery = computed(() => searchQuery.value.trim().toLocaleLowerCase('ru-RU'))
+const normalizedSearchQuery = computed(() => store.filters.searchQuery.trim().toLocaleLowerCase('ru-RU'))
 const isSearchActive = computed(() => normalizedSearchQuery.value.length > 0)
 
-// Фильтры и сортировка
+// Ручная сортировка действует только внутри списка; фильтры общие с канбаном.
 const isManualSort = ref(false)
-const hideFutureTasks = ref(true)
-const showOnlyOverdue = ref(false)
-const selectedDate = ref('')
-const selectedCategoryId = ref<number | ''>('')
-const selectedPriority = ref('')
-const selectedStatus = ref('pending')
 
 // Интервал фонового обновления
 let pollInterval: ReturnType<typeof setInterval> | undefined
@@ -140,7 +135,7 @@ const getVisibleTaskDescription = (task: Task) => {
 }
 
 const getHighlightedSegments = (text: string): TextSegment[] => {
-  const query = searchQuery.value.trim()
+  const query = store.filters.searchQuery.trim()
   if (!query) return [{ text, isMatch: false }]
 
   const escapedQuery = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -164,67 +159,9 @@ const getHighlightedSegments = (text: string): TextSegment[] => {
   return segments.length > 0 ? segments : [{ text, isMatch: false }]
 }
 
-const priorityWeight: Record<string, number> = { high: 3, medium: 2, low: 1 }
-
-const filteredAndSortedTasks = computed(() => {
-  let result = [...store.tasks]
-  const now = new Date()
-
-  if (hideFutureTasks.value && !showOnlyOverdue.value) {
-    const today = new Date(now)
-    today.setHours(0, 0, 0, 0)
-    result = result.filter(t => {
-      if (!t.due_at) return true
-      const taskDate = new Date(t.due_at)
-      taskDate.setHours(0, 0, 0, 0)
-      return taskDate <= today
-    })
-  }
-  
-  if (showOnlyOverdue.value) {
-    result = result.filter(t => {
-      if (!t.due_at) return false
-      return new Date(t.due_at).getTime() < now.getTime() && t.status !== 'completed'
-    })
-  }
-
-  if (selectedDate.value) {
-    result = result.filter(t => t.due_at && t.due_at.startsWith(selectedDate.value))
-  }
-
-  if (selectedCategoryId.value !== '') {
-    result = result.filter(t => t.category_id === selectedCategoryId.value)
-  }
-
-  if (selectedPriority.value) {
-    result = result.filter(t => t.priority === selectedPriority.value)
-  }
-  
-  if (selectedStatus.value !== 'all') {
-    result = result.filter(t => t.status === selectedStatus.value)
-  }
-
-  if (normalizedSearchQuery.value) {
-    result = result.filter(t => (
-      t.description.toLocaleLowerCase('ru-RU').includes(normalizedSearchQuery.value)
-    ))
-  }
-
-  if (isManualSort.value && !showOnlyOverdue.value) {
-    result.sort((a, b) => a.order_index - b.order_index)
-  } else {
-    result.sort((a, b) => {
-      const dateA = a.due_at ? new Date(a.due_at).getTime() : new Date(a.created_at).getTime()
-      const dateB = b.due_at ? new Date(b.due_at).getTime() : new Date(b.created_at).getTime()
-      if (dateB !== dateA) return dateB - dateA
-      const pA = priorityWeight[a.priority] || 0
-      const pB = priorityWeight[b.priority] || 0
-      return pB - pA
-    })
-  }
-
-  return result
-})
+const filteredAndSortedTasks = computed(() => filterTasks(store.tasks, store.filters, {
+  manualSort: isManualSort.value,
+}))
 
 // Двухстороннее связывание для vuedraggable
 const draggableTasks = computed({
@@ -251,7 +188,7 @@ const toggleStatus = async (task: Task) => {
   await store.updateTask(task.id, { status: newStatus })
 }
 
-const formatDate = (dateStr?: string) => {
+const formatDate = (dateStr?: string | null) => {
   if (!dateStr) return 'Без даты'
   const date = new Date(dateStr)
   const now = new Date()
@@ -270,7 +207,7 @@ const formatDate = (dateStr?: string) => {
   return date.toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })
 }
 
-const getFullDateTooltip = (dateStr?: string) => {
+const getFullDateTooltip = (dateStr?: string | null) => {
   if (!dateStr) return 'Без даты'
   return new Date(dateStr).toLocaleString('ru-RU', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
@@ -281,8 +218,7 @@ const getPriorityIcon = (priority: string) => {
 }
 
 const getPriorityLabel = (priority: string) => {
-  const map: Record<string, string> = { high: 'Высокий', medium: 'Средний', low: 'Низкий' }
-  return map[priority] || priority
+  return TASK_PRIORITIES.find((item) => item.value === priority)?.label || priority
 }
 </script>
 
@@ -295,43 +231,7 @@ const getPriorityLabel = (priority: string) => {
           <span class="btn-text">+ Создать задачу</span>
         </button>
         
-        <div class="task-search" role="search">
-          <svg class="task-search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="8"></circle>
-            <path d="m21 21-4.35-4.35"></path>
-          </svg>
-          <input
-            v-model="searchQuery"
-            type="search"
-            class="task-search-input"
-            placeholder="Поиск по задачам"
-            aria-label="Поиск по задачам"
-            autocomplete="off"
-            spellcheck="false"
-            @keydown.esc="searchQuery = ''"
-          />
-          <span
-            v-if="isSearchActive"
-            class="task-search-count"
-            :aria-label="`Найдено задач: ${filteredAndSortedTasks.length}`"
-            aria-live="polite"
-          >
-            {{ filteredAndSortedTasks.length }}
-          </span>
-          <button
-            v-if="isSearchActive"
-            type="button"
-            class="task-search-clear"
-            aria-label="Очистить поиск"
-            title="Очистить поиск"
-            @click="searchQuery = ''"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">
-              <path d="M18 6 6 18"></path>
-              <path d="m6 6 12 12"></path>
-            </svg>
-          </button>
-        </div>
+        <TaskSearch :result-count="filteredAndSortedTasks.length" />
 
         <div class="controls-right">
           <button class="btn btn-secondary" @click="showFilters = !showFilters">
@@ -347,51 +247,11 @@ const getPriorityLabel = (priority: string) => {
       </div>
 
       <div v-if="showFilters" class="filters-panel">
-        <div class="filters-grid">
-          <div class="filter-group">
-            <label>Статус</label>
-            <select v-model="selectedStatus" class="form-control">
-              <option value="pending">Активные</option>
-              <option value="completed">Выполненные</option>
-              <option value="all">Все</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label>Дата</label>
-            <input type="date" v-model="selectedDate" class="form-control" />
-          </div>
-          <div class="filter-group">
-            <label>Категория</label>
-            <select v-model="selectedCategoryId" class="form-control">
-              <option value="">Все категории</option>
-              <option v-for="cat in store.categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label>Приоритет</label>
-            <select v-model="selectedPriority" class="form-control">
-              <option value="">Любой</option>
-              <option value="high">Высокий</option>
-              <option value="medium">Средний</option>
-              <option value="low">Низкий</option>
-            </select>
-          </div>
-          <div class="filter-group">
-            <label>Отображение</label>
-            <label class="checkbox-label" style="margin-top: 0.5rem">
-              <input type="checkbox" v-model="hideFutureTasks" />
-              Скрыть будущие
-            </label>
-            <label class="checkbox-label" style="margin-top: 0.5rem">
-              <input type="checkbox" v-model="showOnlyOverdue" />
-              Только просроченные
-            </label>
-          </div>
-          <div class="filter-group" v-if="isManualSort">
-            <label>Сортировка</label>
-            <button class="btn btn-secondary btn-small" @click="isManualSort = false">Сбросить ручную</button>
-          </div>
-        </div>
+        <TaskFiltersPanel
+          id-prefix="list"
+          :manual-sort="isManualSort"
+          @reset-manual-sort="isManualSort = false"
+        />
       </div>
     </div>
 
@@ -413,7 +273,7 @@ const getPriorityLabel = (priority: string) => {
         <template v-if="isSearchActive">
           <strong>Совпадений не найдено</strong>
           <span>Измените запрос или активные фильтры.</span>
-          <button type="button" class="empty-state-reset" @click="searchQuery = ''">Очистить поиск</button>
+          <button type="button" class="empty-state-reset" @click="store.filters.searchQuery = ''">Очистить поиск</button>
         </template>
         <span v-else>Задач не найдено</span>
       </div>

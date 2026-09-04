@@ -3,6 +3,44 @@
 Последние 25 завершённых задач, в которых изменялся код проекта.
 Новые записи располагаются сверху.
 
+## 2026-09-04 — Канбан задач: приоритет, категория и недельная дата
+
+**Работали над:** всеми тремя канбан-задачами из backlog и общим состоянием фильтров списка/доски.
+
+**Изменения:**
+- добавлен защищённый route `/kanban`, общая навигация рабочего пространства и режимы «Приоритет», «Категория», «Дата»;
+- поиск и фильтры вынесены в единый Pinia contract, поэтому выбранное состояние сохраняется при переключении представлений;
+- drag-and-drop и доступный `select` сохраняют изменения через существующий owned task API;
+- оптимистичное перемещение откатывается и повторно синхронизируется при сетевой или API-ошибке;
+- недельный режим показывает семь локальных дней, задачи без даты и задачи вне горизонта, сохраняет локальное время и связанные recurrence/reminder fields;
+- добавлены продуктовый UI-контекст, feature-документация и unit-тесты общих фильтров и календарных границ.
+
+**Файлы:**
+- `PRODUCT.md`
+- `frontend/src/views/KanbanView.vue`
+- `frontend/src/components/WorkspaceHeader.vue`
+- `frontend/src/components/tasks/KanbanBoard.vue`
+- `frontend/src/components/tasks/TaskFiltersPanel.vue`
+- `frontend/src/components/tasks/TaskSearch.vue`
+- `frontend/src/components/tasks/TasksDashboard.vue`
+- `frontend/src/stores/tasks.ts`
+- `frontend/src/utils/taskPlanning.ts`
+- `frontend/src/assets/kanban.css`
+- `frontend/src/assets/tasks.css`
+- `frontend/src/router/index.ts`
+- `frontend/src/types/index.ts`
+- `frontend/tests/taskPlanning.test.ts`
+- `frontend/package.json`
+- `docs/features/kanban.md`
+- `backlog.md`
+- `devlog.md`
+
+**Проверки:**
+- `vue-tsc --build` — успешно;
+- `vite build` — успешно;
+- `node --test tests/taskPlanning.test.ts` — 5 из 5 успешно;
+- browser smoke-test desktop/mobile, трёх режимов, keyboard/tap-перемещения и отката при недоступном API — успешно.
+
 ## 2026-09-04 — Локальный поиск по списку задач
 
 **Работали над:** заменой AI-поля в списке задач обычным поиском по уже загруженному беклогу.

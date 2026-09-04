@@ -4,6 +4,7 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useTasksStore } from '@/stores/tasks'
 import type { Task } from '@/types'
+import { TASK_PRIORITIES } from '@/utils/taskPlanning'
 
 const props = defineProps<{
   taskToEdit?: Task | null
@@ -196,25 +197,15 @@ const deleteTask = async () => {
           <label>Приоритет</label>
           <div class="priority-selector">
             <button 
+              v-for="priority in TASK_PRIORITIES"
+              :key="priority.value"
               type="button" 
-              class="priority-circle high" 
-              :class="{ selected: formData.priority === 'high' }" 
-              @click="formData.priority = 'high'" 
-              title="Высокий"
-            ></button>
-            <button 
-              type="button" 
-              class="priority-circle medium" 
-              :class="{ selected: formData.priority === 'medium' }" 
-              @click="formData.priority = 'medium'" 
-              title="Средний"
-            ></button>
-            <button 
-              type="button" 
-              class="priority-circle low" 
-              :class="{ selected: formData.priority === 'low' }" 
-              @click="formData.priority = 'low'" 
-              title="Низкий"
+              class="priority-circle"
+              :class="[priority.value, { selected: formData.priority === priority.value }]"
+              :aria-label="priority.label"
+              :aria-pressed="formData.priority === priority.value"
+              :title="priority.label"
+              @click="formData.priority = priority.value"
             ></button>
           </div>
         </div>

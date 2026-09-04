@@ -2,10 +2,9 @@
 <!-- Управляет входом пользователя и отображает основной экран задач после авторизации. -->
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
 import TasksDashboard from '../components/tasks/TasksDashboard.vue'
+import WorkspaceHeader from '../components/WorkspaceHeader.vue'
 
-const router = useRouter()
 const isAuthenticated = ref(false)
 const userToken = ref(localStorage.getItem('access_token') || '')
 
@@ -164,12 +163,6 @@ const pollTelegramAuthStatus = async () => {
   }
 };
 
-const logout = () => {
-  localStorage.removeItem('access_token');
-  userToken.value = '';
-  isAuthenticated.value = false;
-  stopTelegramPolling();
-};
 </script>
 
 <template>
@@ -215,13 +208,7 @@ const logout = () => {
     </div>
     
     <div v-else>
-      <div class="header-controls">
-        <div class="user-status-badge">JetPlan Workspace</div>
-        <div style="display: flex; gap: 1rem;">
-          <button @click="router.push('/settings')" class="logout-btn">Настройки</button>
-          <button @click="logout" class="logout-btn">Выйти</button>
-        </div>
-      </div>
+      <WorkspaceHeader />
       <TasksDashboard />
     </div>
   </main>
@@ -361,35 +348,4 @@ const logout = () => {
   font-size: 0.9rem;
 }
 
-.header-controls {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 2rem;
-  padding: 0 1rem;
-  max-width: 100%;
-}
-
-.user-status-badge {
-  font-size: 1.2rem;
-  font-weight: 800;
-  color: var(--color-heading);
-}
-
-.logout-btn {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  color: var(--color-text);
-  padding: 0.5rem 1.2rem;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.9rem;
-  font-weight: 500;
-  transition: all 0.2s;
-}
-
-.logout-btn:hover {
-  background-color: var(--color-background-mute);
-  border-color: var(--color-border-hover);
-}
 </style>

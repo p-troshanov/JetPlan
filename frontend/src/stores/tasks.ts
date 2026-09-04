@@ -1,13 +1,16 @@
 // frontend/src/stores/tasks.ts
-import { ref } from 'vue'
+// Хранит общую коллекцию задач, фильтры и безопасные операции обновления данных.
+import { reactive, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { Task, Category } from '../types'
+import { createDefaultTaskFilters } from '../utils/taskPlanning'
 
 export const useTasksStore = defineStore('tasks', () => {
   const tasks = ref<Task[]>([])
   const categories = ref<Category[]>([])
   const isLoading = ref(false)
   const error = ref<string | null>(null)
+  const filters = reactive(createDefaultTaskFilters())
 
   const getHeaders = () => {
     const token = localStorage.getItem('access_token')
@@ -23,6 +26,16 @@ export const useTasksStore = defineStore('tasks', () => {
       localStorage.removeItem('access_token')
       window.location.reload()
     }
+  }
+
+  const getApiError = async (res: Response, fallback: string) => {
+    try {
+      const payload = await res.json()
+      if (typeof payload?.detail === 'string') return payload.detail
+    } catch {
+      // Ответ без JSON обрабатывается единым пользовательским сообщением ниже.
+    }
+    return fallback
   }
 
   // === Категории ===
@@ -103,6 +116,9 @@ export const useTasksStore = defineStore('tasks', () => {
       handleUnauthorized(res.status)
       if (res.ok) {
         tasks.value = await res.json()
+        error.value = null
+      } else {
+        error.value = await getApiError(res, 'Не удалось загрузить задачи')
       }
     } catch (err) {
       error.value = 'Ошибка загрузки задач'
@@ -142,7 +158,46 @@ export const useTasksStore = defineStore('tasks', () => {
       }
       return updatedTask
     }
-    throw new Error('Failed to update task')
+    throw new Error(await getApiError(res, 'Не удалось сохранить задачу'))
+  }
+
+  const applyLocalTaskPatch = (task: Task, taskData: Partial<Task>): Task => {
+    const updatedTask = { ...task, ...taskData }
+
+    if (Object.prototype.hasOwnProperty.call(taskData, 'category_id')) {
+      if (taskData.category_id == null) {
+        updatedTask.category_id = null
+        updatedTask.category = null
+      } else {
+        const category = categories.value.find((item) => item.id === taskData.category_id)
+        if (!category) throw new Error('Категория больше недоступна')
+        updatedTask.category = category
+      }
+    }
+
+    return updatedTask
+  }
+
+  const updateTaskOptimistically = async (id: number, taskData: Partial<Task>) => {
+    const index = tasks.value.findIndex((task) => task.id === id)
+    if (index === -1) throw new Error('Задача больше недоступна')
+
+    const currentTask = tasks.value[index]!
+    const previousTask: Task = {
+      ...currentTask,
+      category: currentTask.category ? { ...currentTask.category } : currentTask.category,
+    }
+
+    tasks.value[index] = applyLocalTaskPatch(currentTask, taskData)
+
+    try {
+      return await updateTask(id, taskData)
+    } catch (requestError) {
+      const rollbackIndex = tasks.value.findIndex((task) => task.id === id)
+      if (rollbackIndex !== -1) tasks.value[rollbackIndex] = previousTask
+      await fetchTasks(true)
+      throw requestError
+    }
   }
 
   const deleteTask = async (id: number) => {
@@ -203,8 +258,8 @@ export const useTasksStore = defineStore('tasks', () => {
   }
 
   return {
-    tasks, categories, isLoading, error,
-    fetchTasks, createTask, updateTask, deleteTask, reorderTasks, sendAiQuery,
+    tasks, categories, isLoading, error, filters,
+    fetchTasks, createTask, updateTask, updateTaskOptimistically, deleteTask, reorderTasks, sendAiQuery,
     fetchCategories, createCategory, updateCategory, deleteCategory
   }
 })

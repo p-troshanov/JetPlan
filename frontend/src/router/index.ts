@@ -1,4 +1,5 @@
 // frontend/src/router/index.ts
+// Определяет маршруты приложения и защищает авторизованные разделы.
 import { createRouter, createWebHistory } from 'vue-router'
 import HomeView from '../views/HomeView.vue'
 
@@ -16,6 +17,12 @@ const router = createRouter({
       component: () => import('../views/SettingsView.vue'),
     },
     {
+      path: '/kanban',
+      name: 'kanban',
+      component: () => import('../views/KanbanView.vue'),
+      meta: { requiresAuth: true },
+    },
+    {
       path: '/about',
       name: 'about',
       // route level code-splitting
@@ -24,6 +31,12 @@ const router = createRouter({
       component: () => import('../views/AboutView.vue'),
     },
   ],
+})
+
+router.beforeEach((to) => {
+  if (to.meta.requiresAuth && !localStorage.getItem('access_token')) {
+    return { name: 'home' }
+  }
 })
 
 export default router

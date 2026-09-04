@@ -1,4 +1,5 @@
 /* frontend/src/assets/tasks.css */
+/* Оформляет список задач, общие фильтры и модальные формы управления задачами. */
 .tasks-dashboard {
   display: flex;
   flex-direction: column;
@@ -295,6 +296,18 @@
   word-break: break-word;
   line-height: 1.4;
   white-space: pre-wrap;
+}
+
+.filter-label {
+  color: var(--color-text-light-2);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.filter-note {
+  color: var(--color-text-light-2);
+  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
 .search-match {
