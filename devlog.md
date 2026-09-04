@@ -8,7 +8,7 @@
 **Работали над:** переводом frontend runtime с Vite dev server на статическую nginx-раздачу и устранением блокирующих ошибок TypeScript.
 
 **Изменения:**
-- frontend переведён на multi-stage Docker build с воспроизводимой установкой через `npm ci`, обязательным typecheck/build и минимальным nginx runtime;
+- frontend переведён на multi-stage Docker build с воспроизводимой установкой через `npm ci --no-audit --no-fund`, обязательным typecheck/build и минимальным nginx runtime; audit остаётся отдельной явной проверкой и не блокирует server build при зависании registry;
 - добавлены SPA fallback, `/health`, cache headers для хешированных assets и ожидание готовности frontend внешним nginx;
 - удалено production-проксирование HMR/WebSocket и обновлён порт frontend upstream;
 - polling Telegram-входа теперь останавливается общей типизированной функцией, поэтому кнопка отмены не обращается к отсутствующему методу компонента;
