@@ -3,6 +3,35 @@
 Последние 25 завершённых задач, в которых изменялся код проекта.
 Новые записи располагаются сверху.
 
+## 2026-09-04 — Серверная пересборка и очистка Jetplan images
+
+**Работали над:** поставкой исправлений Docker build context, пересборкой server images и оценкой необходимости ротации секретов.
+
+**Изменения:**
+- commits `8ebe290` и `281b9e7` отправлены в `origin/main` и получены сервером через fast-forward;
+- frontend image build использует `npm ci --no-audit --no-fund`, чтобы обязательная lockfile-установка не зависела от нестабильных audit/fund-запросов;
+- штатная команда `deploy_jetplan` и обязательный синтаксис `podman compose` зафиксированы в корневом README;
+- server-контейнеры переключены на backend image `c6f5d749c2ec` и frontend image `546c4d06b650`;
+- старые неиспользуемые Jetplan images `3e651cd9b198` и `41c0351292c7` удалены; в старом backend image подтверждено наличие `/app/.env` без чтения значений.
+
+**Файлы:**
+- `frontend/Dockerfile`
+- `README.md`
+- `backlog.md`
+- `devlog.md`
+
+**Проверки:**
+- backend unit/security tests — 10 из 10 успешно;
+- Python compileall и `pip check` — успешно;
+- frontend typecheck и production build локально и внутри server image — успешно;
+- Dockerfile build check — успешно;
+- server `podman compose ps` — backend, database, frontend и nginx запущены; frontend — `healthy`;
+- публичные `/health`, `/api/health` и `/settings` — HTTP 200;
+- удаление двух прежних image ID подтверждено, новые image ID сохранились.
+
+**Ограничения:**
+- registry publication старого образа не подтверждена; секреты не ротировались. Если старый backend image экспортировался или публиковался за пределами доверенного сервера, требуется ротация `SECRET_KEY`, `TELEGRAM_BOT_TOKEN` и `DATABASE_URL`.
+
 ## 2026-09-04 — Production static build frontend и исправление typecheck
 
 **Работали над:** переводом frontend runtime с Vite dev server на статическую nginx-раздачу и устранением блокирующих ошибок TypeScript.
