@@ -7,6 +7,7 @@ import { useUserStore } from '@/stores/user'
 import draggable from 'vuedraggable'
 import type { Task } from '@/types'
 import { TASK_PRIORITIES, filterTasks } from '@/utils/taskPlanning'
+import { buildTaskDescriptionPreview } from '@/utils/taskDescription'
 import '@/assets/tasks.css'
 
 import TaskModal from './TaskModal.vue'
@@ -127,12 +128,16 @@ type TextSegment = {
 }
 
 const getVisibleTaskDescription = (task: Task) => {
-  if (isSearchActive.value || expandedTasks.value.has(task.id) || task.description.length <= 80) {
+  if (isSearchActive.value || expandedTasks.value.has(task.id)) {
     return task.description
   }
 
-  return `${task.description.slice(0, 150)}...`
+  return buildTaskDescriptionPreview(task.description).text
 }
+
+const canToggleTaskDescription = (task: Task) => (
+  !isSearchActive.value && buildTaskDescriptionPreview(task.description).isTruncated
+)
 
 const getHighlightedSegments = (text: string): TextSegment[] => {
   const query = store.filters.searchQuery.trim()
@@ -304,7 +309,7 @@ const getPriorityLabel = (priority: string) => {
             </div>
             
             <div class="task-text-container">
-              <div class="task-text">
+              <div :id="`task-description-${task.id}`" class="task-text">
                 <template
                   v-for="(segment, index) in getHighlightedSegments(getVisibleTaskDescription(task))"
                   :key="`${task.id}-${index}`"
@@ -313,10 +318,19 @@ const getPriorityLabel = (priority: string) => {
                   <template v-else>{{ segment.text }}</template>
                 </template>
               </div>
-              <span v-if="task.description.length > 80 && !isSearchActive" class="expand-text-btn" @click.stop="toggleTaskText(task.id)">
+              <button
+                v-if="canToggleTaskDescription(task)"
+                type="button"
+                class="expand-text-btn"
+                :aria-controls="`task-description-${task.id}`"
+                :aria-expanded="expandedTasks.has(task.id)"
+                :aria-label="expandedTasks.has(task.id) ? 'Свернуть описание задачи' : 'Показать описание задачи полностью'"
+                :title="expandedTasks.has(task.id) ? 'Свернуть описание' : 'Показать полностью'"
+                @click.stop="toggleTaskText(task.id)"
+              >
                 <svg v-if="!expandedTasks.has(task.id)" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
                 <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 15l-6-6-6 6"/></svg>
-              </span>
+              </button>
             </div>
 
             <div>

@@ -1,7 +1,7 @@
 <!-- frontend/src/views/SettingsView.vue -->
 <!-- Показывает профиль, настройки приложения, смену пароля и безопасную привязку Telegram. -->
 <script setup lang="ts">
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useUserStore, type UserProfileUpdate } from '@/stores/user'
 
@@ -30,6 +30,17 @@ const tgCode = ref('')
 const codeSent = ref(false)
 const message = ref('')
 const isError = ref(false)
+type ProfileSettingsSection = 'profile' | 'ai' | 'stt' | 'app'
+
+const savingSection = ref<ProfileSettingsSection | null>(null)
+let messageTimer: ReturnType<typeof setTimeout> | undefined
+
+const profileSaveMessages: Record<ProfileSettingsSection, string> = {
+  profile: 'Профиль сохранён',
+  ai: 'Настройки нейросети сохранены',
+  stt: 'Настройки голосового ввода сохранены',
+  app: 'Настройки приложения сохранены',
+}
 
 const aiProviderName = computed(() => (
   formData.value.ai_provider === 'openrouter' ? 'OpenRouter' : 'Groq'
@@ -62,12 +73,20 @@ onMounted(async () => {
 })
 
 const showMessage = (msg: string, error = false) => {
+  if (messageTimer) clearTimeout(messageTimer)
   message.value = msg
   isError.value = error
-  setTimeout(() => { message.value = '' }, 5000)
+  messageTimer = setTimeout(() => { message.value = '' }, 5000)
 }
 
-const saveProfile = async () => {
+onUnmounted(() => {
+  if (messageTimer) clearTimeout(messageTimer)
+})
+
+const saveProfile = async (section: ProfileSettingsSection) => {
+  if (savingSection.value) return
+
+  savingSection.value = section
   const payload: UserProfileUpdate = {
     first_name: formData.value.first_name,
     last_name: formData.value.last_name,
@@ -84,10 +103,11 @@ const saveProfile = async () => {
   if (result.ok) {
     formData.value.ai_api_key = ''
     formData.value.stt_api_key = ''
-    showMessage('Настройки сохранены')
+    showMessage(profileSaveMessages[section])
   } else {
     showMessage(result.error || 'Ошибка при сохранении', true)
   }
+  savingSection.value = null
 }
 
 const changePassword = async () => {
@@ -161,8 +181,14 @@ const verifyTelegramCode = async () => {
       <button class="btn btn-secondary" @click="router.push('/')">На главную</button>
     </div>
 
-    <div v-if="message" :class="['alert', isError ? 'alert-error' : 'alert-success']">
-      {{ message }}
+    <div
+      v-if="message"
+      :class="['alert', isError ? 'alert-error' : 'alert-success']"
+      :role="isError ? 'alert' : 'status'"
+      :aria-live="isError ? 'assertive' : 'polite'"
+    >
+      <span class="alert-icon" aria-hidden="true">{{ isError ? '!' : '✓' }}</span>
+      <span>{{ message }}</span>
     </div>
 
     <div class="settings-content">
@@ -177,7 +203,14 @@ const verifyTelegramCode = async () => {
           <input type="text" v-model="formData.last_name" class="form-control" />
           
           <div></div>
-          <button class="btn btn-primary btn-auto" @click="saveProfile">Сохранить профиль</button>
+          <button
+            class="btn btn-primary btn-auto"
+            :disabled="savingSection !== null"
+            :aria-busy="savingSection === 'profile'"
+            @click="saveProfile('profile')"
+          >
+            {{ savingSection === 'profile' ? 'Сохранение…' : 'Сохранить профиль' }}
+          </button>
         </div>
       </section>
 
@@ -218,7 +251,14 @@ const verifyTelegramCode = async () => {
           </div>
           
           <div></div>
-          <button class="btn btn-primary btn-auto" @click="saveProfile">Сохранить нейросеть</button>
+          <button
+            class="btn btn-primary btn-auto"
+            :disabled="savingSection !== null"
+            :aria-busy="savingSection === 'ai'"
+            @click="saveProfile('ai')"
+          >
+            {{ savingSection === 'ai' ? 'Сохранение…' : 'Сохранить нейросеть' }}
+          </button>
         </div>
       </section>
 
@@ -246,7 +286,14 @@ const verifyTelegramCode = async () => {
           </div>
 
           <div></div>
-          <button class="btn btn-primary btn-auto" @click="saveProfile">Сохранить голосовой ввод</button>
+          <button
+            class="btn btn-primary btn-auto"
+            :disabled="savingSection !== null"
+            :aria-busy="savingSection === 'stt'"
+            @click="saveProfile('stt')"
+          >
+            {{ savingSection === 'stt' ? 'Сохранение…' : 'Сохранить голосовой ввод' }}
+          </button>
         </div>
       </section>
 
@@ -265,7 +312,14 @@ const verifyTelegramCode = async () => {
           </label>
           
           <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end;">
-            <button class="btn btn-primary btn-auto" @click="saveProfile">Сохранить настройки</button>
+            <button
+              class="btn btn-primary btn-auto"
+              :disabled="savingSection !== null"
+              :aria-busy="savingSection === 'app'"
+              @click="saveProfile('app')"
+            >
+              {{ savingSection === 'app' ? 'Сохранение…' : 'Сохранить настройки' }}
+            </button>
           </div>
         </div>
       </section>
@@ -432,6 +486,11 @@ const verifyTelegramCode = async () => {
   background-color: hsla(160, 100%, 32%, 1);
 }
 
+.btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .btn-secondary {
   background-color: var(--color-background-mute);
   color: var(--color-text);
@@ -477,23 +536,45 @@ const verifyTelegramCode = async () => {
 }
 
 .alert {
-  padding: 1rem;
+  position: fixed;
+  z-index: 2000;
+  top: 1.25rem;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: min(calc(100vw - 2rem), 36rem);
+  padding: 0.8rem 1rem;
+  transform: translateX(-50%);
   border-radius: 8px;
-  margin-bottom: 1.5rem;
-  text-align: center;
-  font-weight: bold;
+  box-shadow: 0 12px 30px oklch(12% 0.01 160 / 28%);
+  font-weight: 600;
 }
 
 .alert-success {
-  background-color: #e8f5e9;
-  color: #2e7d32;
-  border: 1px solid #c8e6c9;
+  color: oklch(94% 0.015 160);
+  background-color: oklch(31% 0.055 160);
+  border: 1px solid oklch(56% 0.095 160);
 }
 
 .alert-error {
-  background-color: #ffebee;
-  color: #c62828;
-  border: 1px solid #ffcdd2;
+  color: oklch(95% 0.012 25);
+  background-color: oklch(34% 0.07 25);
+  border: 1px solid oklch(59% 0.12 25);
+}
+
+.alert-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 1.5rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .text-success {

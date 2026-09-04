@@ -460,19 +460,25 @@
 }
 
 .expand-text-btn {
-  cursor: pointer;
-  color: hsla(160, 100%, 37%, 1);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2px 4px;
+  color: hsla(160, 100%, 37%, 1);
   border-radius: 4px;
+  border: 0;
   background: var(--color-background-mute);
-  transition: background 0.2s;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
 .expand-text-btn:hover {
   background: var(--color-border);
+}
+
+.expand-text-btn:focus-visible {
+  outline: 2px solid hsla(160, 100%, 37%, 0.8);
+  outline-offset: 2px;
 }
 
 .priority-wrapper {
