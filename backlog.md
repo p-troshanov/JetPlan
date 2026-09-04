@@ -151,7 +151,7 @@
   - Где: `frontend/package.json`, отсутствующие `tests/` и CI-конфигурация.
   - Следующий шаг: добавить минимум contract/API tests, component tests критичных обработчиков, production-build smoke test и проверку прямого открытия SPA routes.
 
-- [ ] Исправить утечку listener `visibilitychange`
+- [x] Исправить утечку listener `visibilitychange`
   - Контекст: listener добавляется анонимной функцией, а удаляется ссылкой на `syncOnFocus`, поэтому после повторных mount остаются лишние фоновые запросы.
   - Где: `frontend/src/components/tasks/TasksDashboard.vue`.
   - Следующий шаг: хранить одну именованную функцию-обработчик и удалять ту же ссылку при unmount.

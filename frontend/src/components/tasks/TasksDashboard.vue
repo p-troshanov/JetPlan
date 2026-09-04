@@ -1,4 +1,5 @@
 // frontend/src/components/tasks/TasksDashboard.vue
+// Отображает список задач, фильтры и управляет фоновым обновлением данных.
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useTasksStore } from '@/stores/tasks'
@@ -71,6 +72,10 @@ const syncOnFocus = () => {
   }
 }
 
+const handleVisibilityChange = () => {
+  if (document.visibilityState === 'visible') syncOnFocus()
+}
+
 onMounted(async () => {
   await userStore.fetchProfile()
   await store.fetchCategories()
@@ -78,9 +83,7 @@ onMounted(async () => {
   window.addEventListener('keydown', handleGlobalKeydown)
   
   window.addEventListener('focus', syncOnFocus)
-  document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') syncOnFocus()
-  })
+  document.addEventListener('visibilitychange', handleVisibilityChange)
 
   // Фоновый поллинг новых задач из Телеграма каждые 10 секунд
   pollInterval = setInterval(() => {
@@ -94,7 +97,7 @@ onMounted(async () => {
 onUnmounted(() => {
   window.removeEventListener('keydown', handleGlobalKeydown)
   window.removeEventListener('focus', syncOnFocus)
-  document.removeEventListener('visibilitychange', syncOnFocus)
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
   if (pollInterval) clearInterval(pollInterval)
 })
 
