@@ -51,6 +51,9 @@ const logout = () => {
 }
 
 .workspace-nav-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-height: 2.5rem;
   padding: 0.5rem 0.85rem;
   color: var(--color-text);
@@ -104,6 +107,25 @@ const logout = () => {
     width: 100%;
     min-height: 2.75rem;
     text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .workspace-header {
+    gap: 1rem;
+  }
+
+  .workspace-brand {
+    font-size: 1.1rem;
+  }
+
+  .workspace-nav {
+    gap: 0.35rem;
+  }
+
+  .workspace-nav-link {
+    padding-inline: 0.55rem;
+    font-size: 0.85rem;
   }
 }
 </style>

@@ -48,12 +48,12 @@
   - Где: `frontend/src/stores/tasks.ts`, `frontend/src/stores/user.ts`, `frontend/src/components/tasks/CategoryModal.vue`, `frontend/src/components/tasks/TaskModal.vue`, `frontend/src/components/tasks/TasksDashboard.vue`, `frontend/src/views/SettingsView.vue`.
   - Следующий шаг: добавить общий API-клиент с нормализацией ошибок, обработкой 401/5xx, пользовательскими error states и тестами отказов.
 
-- [ ] Довести существующие экраны до полноценной мобильной адаптивности
+- [x] Довести существующие экраны до полноценной мобильной адаптивности
   - Контекст: базовые media queries уже есть, но верхняя панель и AI/search-контролы собраны в одну строку, часть размеров задана inline, категории скрываются из карточек, а header, auth, settings и модальные формы не проверены как единый мобильный сценарий.
   - Где: `frontend/src/App.vue`, `frontend/src/views/HomeView.vue`, `frontend/src/views/SettingsView.vue`, `frontend/src/components/tasks/TasksDashboard.vue`, `frontend/src/components/tasks/TaskModal.vue`, `frontend/src/components/tasks/CategoryModal.vue`, `frontend/src/assets/tasks.css`.
   - Зависит от: исправления frontend typecheck; мобильная раскладка будущего канбана входит в задачи канбана, а не в этот пункт.
   - Критерии: на ширинах 360, 390, 768 и 1024 px нет горизонтального скролла и перекрытий; можно войти, просматривать и фильтровать задачи, создать/изменить задачу и категорию, открыть настройки и выйти; модалки прокручиваются внутри viewport, основные действия доступны с клавиатуры и имеют удобную touch-зону.
-  - Следующий шаг: провести viewport-аудит основных состояний, затем исправлять layout mobile-first без изменения backend и API contracts.
+  - Результат: устранены двойные внешние отступы, список и настройки используют доступную ширину телефона/планшета, категории видны в мобильных карточках, компактные действия получили доступные названия и touch-зоны, а формы задач и категорий прокручиваются внутри `100dvh`; browser matrix 360/390/768/1024 px не выявила горизонтального overflow на списке, канбане и настройках.
 
 - [ ] Сделать startup и healthcheck backend достоверными
   - Контекст: ошибки подключения к БД и runtime-DDL перехватываются, после чего приложение продолжает запуск и `/api/health` всегда отвечает `healthy`; Compose ждёт только старт контейнеров, а не готовность сервисов.

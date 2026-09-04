@@ -2,10 +2,9 @@
 <!-- Показывает профиль, настройки приложения, смену пароля и безопасную привязку Telegram. -->
 <script setup lang="ts">
 import { computed, ref, onMounted, onUnmounted } from 'vue'
-import { useRouter } from 'vue-router'
+import WorkspaceHeader from '@/components/WorkspaceHeader.vue'
 import { useUserStore, type UserProfileUpdate } from '@/stores/user'
 
-const router = useRouter()
 const userStore = useUserStore()
 
 const formData = ref({
@@ -175,10 +174,15 @@ const verifyTelegramCode = async () => {
 </script>
 
 <template>
-  <div class="settings-container">
+  <main class="settings-page">
+    <WorkspaceHeader />
+
+    <section class="settings-container" aria-labelledby="settings-title">
     <div class="settings-header">
-      <h2>Настройки</h2>
-      <button class="btn btn-secondary" @click="router.push('/')">На главную</button>
+      <div>
+        <p class="settings-eyebrow">Профиль и приложение</p>
+        <h1 id="settings-title">Настройки</h1>
+      </div>
     </div>
 
     <div
@@ -306,12 +310,12 @@ const verifyTelegramCode = async () => {
             <small class="hint">Например: ctrl+q, alt+n. Работает независимо от раскладки.</small>
           </div>
           
-          <label class="checkbox-label" style="grid-column: 1 / -1; margin-top: 1rem;">
+          <label class="checkbox-label settings-wide-option">
             <input type="checkbox" v-model="formData.auto_postpone_overdue" />
             Автоматически переносить просроченные задачи на сегодня (00:00) с отключением напоминаний
           </label>
           
-          <div style="grid-column: 1 / -1; display: flex; justify-content: flex-end;">
+          <div class="settings-wide-action">
             <button
               class="btn btn-primary btn-auto"
               :disabled="savingSection !== null"
@@ -343,22 +347,22 @@ const verifyTelegramCode = async () => {
         <div class="settings-form-grid">
           <label>Статус</label>
           <div v-if="userStore.profile?.telegram_id">
-            <p class="text-success" style="margin-top: 0.5rem; font-weight: bold;">✓ Telegram аккаунт привязан</p>
+            <p class="text-success telegram-status">✓ Telegram аккаунт привязан</p>
           </div>
           <div v-else>
             
-            <div v-if="!codeSent" style="display: flex; gap: 0.5rem; flex-direction: column; max-width: 320px;">
-              <div style="display: flex; gap: 0.5rem;">
+            <div v-if="!codeSent" class="settings-telegram-stack">
+              <div class="settings-inline-action">
                 <input type="text" v-model="tgUsername" class="form-control" placeholder="@username" />
                 <button class="btn btn-primary btn-auto" @click="requestTelegramCode">Отправить код</button>
               </div>
-              <small class="hint" style="margin-top: 0.5rem; line-height: 1.4;">
+              <small class="hint telegram-help">
                 Укажите логин. <b>Важно:</b> бот сможет отправить код, только если вы зайдете в <a href="https://t.me/jetplan_bot" target="_blank" class="tg-link">@jetplan_bot</a> и хотя бы раз нажмете <b>Запустить</b>.
               </small>
             </div>
 
-            <div v-else style="display: flex; gap: 0.5rem; flex-direction: column; max-width: 320px;">
-              <div style="display: flex; gap: 0.5rem;">
+            <div v-else class="settings-telegram-stack">
+              <div class="settings-inline-action">
                 <input
                   type="text"
                   v-model="tgCode"
@@ -370,11 +374,11 @@ const verifyTelegramCode = async () => {
                 />
                 <button class="btn btn-primary btn-auto" @click="verifyTelegramCode">Подтвердить</button>
               </div>
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">
-                <small class="hint" style="margin: 0;">Код отправлен в бота.</small>
-                <small class="hint" style="margin: 0; cursor: pointer; color: var(--color-heading); text-decoration: underline;" @click="codeSent = false">
+              <div class="settings-inline-meta">
+                <small class="hint">Код отправлен в бота.</small>
+                <button class="settings-change-login" type="button" @click="codeSent = false">
                   Изменить логин
-                </small>
+                </button>
               </div>
             </div>
 
@@ -383,14 +387,19 @@ const verifyTelegramCode = async () => {
       </section>
 
     </div>
-  </div>
+    </section>
+  </main>
 </template>
 
 <style scoped>
+.settings-page {
+  width: 100%;
+  min-width: 0;
+}
+
 .settings-container {
   max-width: 1000px;
-  margin: 2rem auto;
-  padding: 0 1rem;
+  margin: 0 auto;
 }
 
 .settings-header {
@@ -400,8 +409,21 @@ const verifyTelegramCode = async () => {
   margin-bottom: 1.5rem;
 }
 
-.settings-header h2 {
+.settings-header h1 {
   color: var(--color-heading);
+  font-size: clamp(1.75rem, 5vw, 2.25rem);
+  font-weight: 750;
+  line-height: 1.15;
+  letter-spacing: -0.025em;
+}
+
+.settings-eyebrow {
+  margin-bottom: 0.25rem;
+  color: oklch(0.63 0.13 164);
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .settings-content {
@@ -411,7 +433,7 @@ const verifyTelegramCode = async () => {
   background: var(--color-background-soft);
   border: 1px solid var(--color-border);
   border-radius: 12px;
-  padding: 2.5rem;
+  padding: clamp(1rem, 4vw, 2.5rem);
 }
 
 .settings-section {
@@ -440,9 +462,13 @@ const verifyTelegramCode = async () => {
 
 .settings-form-grid {
   display: grid;
-  grid-template-columns: 200px 1fr;
+  grid-template-columns: 12rem minmax(0, 1fr);
   align-items: center;
   gap: 1.2rem 2rem;
+}
+
+.settings-form-grid > * {
+  min-width: 0;
 }
 
 .settings-form-grid label {
@@ -456,10 +482,23 @@ const verifyTelegramCode = async () => {
   gap: 0.5rem;
   cursor: pointer;
   font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.settings-wide-option {
+  grid-column: 1 / -1;
+  margin-top: 1rem;
+}
+
+.settings-wide-action {
+  display: flex;
+  grid-column: 1 / -1;
+  justify-content: flex-end;
 }
 
 .form-control {
   width: 100%;
+  min-height: 2.75rem;
   padding: 0.6rem;
   border: 1px solid var(--color-border);
   border-radius: 6px;
@@ -469,6 +508,7 @@ const verifyTelegramCode = async () => {
 }
 
 .btn {
+  min-height: 2.75rem;
   padding: 0.8rem;
   border: none;
   border-radius: 8px;
@@ -502,6 +542,13 @@ const verifyTelegramCode = async () => {
   border-color: var(--color-border-hover);
 }
 
+.form-control:focus-visible,
+.btn:focus-visible,
+.settings-change-login:focus-visible {
+  outline: 2px solid hsla(160, 100%, 37%, 0.85);
+  outline-offset: 2px;
+}
+
 .btn-auto {
   width: auto;
   align-self: flex-start;
@@ -513,6 +560,61 @@ const verifyTelegramCode = async () => {
   margin-top: 0.3rem;
   font-size: 0.8rem;
   color: var(--color-text-light-2);
+}
+
+.settings-telegram-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 28rem;
+}
+
+.settings-inline-action {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.settings-inline-action .form-control {
+  flex: 1 1 auto;
+}
+
+.settings-inline-action .btn {
+  flex: 0 0 auto;
+}
+
+.settings-inline-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-top: 0.25rem;
+}
+
+.settings-inline-meta .hint {
+  margin: 0;
+}
+
+.settings-change-login {
+  min-height: 2.75rem;
+  padding: 0.45rem 0;
+  color: var(--color-heading);
+  background: transparent;
+  border: 0;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.telegram-help {
+  margin-top: 0.25rem;
+  line-height: 1.45;
+}
+
+.telegram-status {
+  margin-top: 0.5rem;
+  font-weight: 700;
 }
 
 .credential-status {
@@ -582,15 +684,76 @@ const verifyTelegramCode = async () => {
 }
 
 @media (max-width: 768px) {
+  .settings-content {
+    gap: 1.5rem;
+  }
+
+  .settings-section {
+    padding-bottom: 1.5rem;
+  }
+
   .settings-form-grid {
     grid-template-columns: 1fr;
-    gap: 0.5rem 1rem;
+    gap: 0.55rem;
   }
+
   .settings-form-grid label {
-    margin-top: 1rem;
+    margin-top: 0.65rem;
   }
+
   .settings-form-grid label:first-child {
     margin-top: 0;
+  }
+
+  .settings-form-grid > div:empty {
+    display: none;
+  }
+
+  .settings-wide-option {
+    margin-top: 0.75rem;
+  }
+
+  .settings-wide-action {
+    justify-content: flex-start;
+  }
+
+  .btn-auto,
+  .settings-wide-action .btn {
+    width: 100%;
+  }
+}
+
+@media (max-width: 520px) {
+  .settings-header {
+    margin-bottom: 1rem;
+  }
+
+  .settings-content {
+    border-radius: 10px;
+  }
+
+  .settings-section h3 {
+    margin-bottom: 1.15rem;
+  }
+
+  .section-description {
+    margin-top: -0.55rem;
+    margin-bottom: 1.1rem;
+  }
+
+  .settings-inline-action {
+    flex-direction: column;
+  }
+
+  .settings-inline-meta {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 0.25rem;
+  }
+
+  .alert {
+    top: max(0.75rem, env(safe-area-inset-top));
+    width: min(calc(100vw - 1.5rem), 36rem);
   }
 }
 </style>

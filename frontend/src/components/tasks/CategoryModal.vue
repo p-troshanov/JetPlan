@@ -1,4 +1,5 @@
 // frontend/src/components/tasks/CategoryModal.vue
+// Управляет созданием, переименованием и удалением пользовательских категорий.
 <script setup lang="ts">
 import { ref } from 'vue'
 import { useTasksStore } from '@/stores/tasks'
@@ -41,18 +42,18 @@ const cancelEdit = () => {
 
 <template>
   <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-content">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="category-modal-title">
       <div class="modal-header">
-        <h2>Управление категориями</h2>
-        <button class="close-btn" @click="$emit('close')">&times;</button>
+        <h2 id="category-modal-title">Управление категориями</h2>
+        <button class="close-btn" type="button" aria-label="Закрыть" @click="$emit('close')">&times;</button>
       </div>
 
       <div class="modal-body">
         <div class="filter-group">
           <label>Добавить новую</label>
-          <div style="display: flex; gap: 0.5rem;">
+          <div class="category-create-row">
             <input v-model="newCategoryName" class="form-control" placeholder="Название категории" @keyup.enter="handleCreate" />
-            <button class="btn btn-primary" style="width: auto; padding: 0.8rem 1.2rem;" @click="handleCreate">+</button>
+            <button class="btn btn-primary category-add-button" type="button" aria-label="Добавить категорию" @click="handleCreate">+</button>
           </div>
         </div>
 
@@ -61,13 +62,12 @@ const cancelEdit = () => {
             <template v-if="editingId === cat.id">
               <input 
                 v-model="editingName" 
-                class="form-control form-control-sm" 
                 @keyup.enter="saveEdit(cat.id)" 
                 @keyup.esc="cancelEdit" 
-                style="margin-right: 0.5rem;"
+                class="form-control form-control-sm category-edit-input"
                 autoFocus 
               />
-              <div style="display: flex; gap: 0.25rem;">
+              <div class="category-item-actions">
                 <button class="action-icon" title="Сохранить" @click="saveEdit(cat.id)">
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#4caf50" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
                 </button>
@@ -78,7 +78,7 @@ const cancelEdit = () => {
             </template>
             <template v-else>
               <span>{{ cat.name }}</span>
-              <div style="display: flex; gap: 0.25rem;">
+              <div class="category-item-actions">
                 <button class="action-icon" title="Редактировать" @click="startEdit(cat)">
                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
                 </button>
@@ -88,7 +88,7 @@ const cancelEdit = () => {
               </div>
             </template>
           </div>
-          <div v-if="store.categories.length === 0" style="padding: 1rem; text-align: center; color: var(--color-text-light-2);">
+          <div v-if="store.categories.length === 0" class="category-empty-state">
             Нет категорий
           </div>
         </div>

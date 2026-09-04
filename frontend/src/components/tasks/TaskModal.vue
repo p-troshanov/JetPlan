@@ -134,10 +134,10 @@ const deleteTask = async () => {
 
 <template>
   <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-content">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="task-modal-title">
       <div class="modal-header">
-        <h2>{{ taskToEdit ? 'Редактировать задачу' : 'Новая задача' }}</h2>
-        <button class="close-btn" @click="$emit('close')" title="Закрыть (Esc)">&times;</button>
+        <h2 id="task-modal-title">{{ taskToEdit ? 'Редактировать задачу' : 'Новая задача' }}</h2>
+        <button class="close-btn" type="button" aria-label="Закрыть" @click="$emit('close')" title="Закрыть (Esc)">&times;</button>
       </div>
 
       <div class="modal-body">
@@ -162,7 +162,7 @@ const deleteTask = async () => {
 
         <div class="filter-group">
           <label>Срок выполнения</label>
-          <div style="display: flex; gap: 0.5rem;">
+          <div class="task-datetime-row">
             <input 
               type="date" 
               v-model="formData.due_date" 
@@ -221,14 +221,14 @@ const deleteTask = async () => {
 
       <div class="modal-footer-container">
         <div class="modal-footer">
-          <div>
-            <button v-if="taskToEdit" class="btn btn-danger" style="width: auto; padding: 0.8rem;" @click="deleteTask" title="Удалить">
+          <div class="modal-delete-slot">
+            <button v-if="taskToEdit" class="btn btn-danger modal-delete-button" type="button" @click="deleteTask" title="Удалить" aria-label="Удалить задачу">
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
             </button>
           </div>
-          <div style="display: flex; gap: 1rem;">
-            <button class="btn btn-secondary" style="width: auto;" @click="$emit('close')">Отмена</button>
-            <button class="btn btn-primary" style="width: auto;" @click="saveTask">Сохранить</button>
+          <div class="modal-footer-actions">
+            <button class="btn btn-secondary" type="button" @click="$emit('close')">Отмена</button>
+            <button class="btn btn-primary" type="button" @click="saveTask">Сохранить</button>
           </div>
         </div>
         <div class="modal-hint">Ctrl+Enter для сохранения</div>

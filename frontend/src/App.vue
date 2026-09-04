@@ -1,4 +1,5 @@
 // frontend/src/App.vue
+// Предоставляет корневой адаптивный контейнер для всех маршрутов приложения.
 <script setup lang="ts">
 import { RouterView } from 'vue-router'
 </script>
@@ -12,13 +13,7 @@ import { RouterView } from 'vue-router'
 <style scoped>
 .app-wrapper {
   width: 100%;
-  min-height: 100vh;
-  padding: 2rem;
-}
-
-@media (max-width: 1024px) {
-  .app-wrapper {
-    padding: 1rem;
-  }
+  min-width: 0;
+  min-height: 100dvh;
 }
 </style>

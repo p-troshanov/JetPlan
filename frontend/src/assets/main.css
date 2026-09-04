@@ -1,12 +1,23 @@
 /* frontend/src/assets/main.css */
+/* Настраивает глобальный контейнер приложения и адаптивные внешние отступы. */
 @import './base.css';
 
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  font-weight: normal;
   width: 100%;
+  max-width: 1440px;
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: clamp(1rem, 3vw, 2rem);
+  font-weight: normal;
+}
+
+html {
+  min-width: 320px;
+  scroll-behavior: smooth;
+}
+
+body {
+  overflow-x: clip;
 }
 
 a,
@@ -23,8 +34,8 @@ a,
   }
 }
 
-@media (min-width: 1024px) {
+@media (max-width: 480px) {
   #app {
-    padding: 0 2rem;
+    padding: 0.75rem;
   }
 }

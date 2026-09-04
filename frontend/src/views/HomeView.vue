@@ -215,11 +215,15 @@ const pollTelegramAuthStatus = async () => {
 </template>
 
 <style scoped>
+main {
+  min-width: 0;
+}
+
 .auth-container {
-  max-width: 400px;
-  margin: 4rem auto;
+  width: min(100%, 26rem);
+  margin: clamp(1rem, 10dvh, 4rem) auto;
   text-align: center;
-  padding: 2.5rem;
+  padding: clamp(1.25rem, 6vw, 2.5rem);
   border: 1px solid var(--color-border);
   border-radius: 12px;
   background-color: var(--color-background-soft);
@@ -250,6 +254,8 @@ const pollTelegramAuthStatus = async () => {
 
 .auth-tabs button {
   flex: 1;
+  min-width: 0;
+  min-height: 2.75rem;
   background: transparent;
   border: none;
   padding: 0.6rem;
@@ -274,6 +280,7 @@ const pollTelegramAuthStatus = async () => {
 }
 
 .auth-form input {
+  min-height: 2.75rem;
   padding: 0.9rem;
   border: 1px solid var(--color-border);
   border-radius: 8px;
@@ -288,6 +295,7 @@ const pollTelegramAuthStatus = async () => {
 }
 
 .primary-btn {
+  min-height: 2.75rem;
   background-color: hsla(160, 100%, 37%, 1);
   color: white;
   border: none;
@@ -340,12 +348,29 @@ const pollTelegramAuthStatus = async () => {
 }
 
 .btn-cancel {
+  min-height: 2.75rem;
+  padding: 0.5rem 0.75rem;
   background: transparent;
   border: none;
   color: var(--color-text-light-2);
   cursor: pointer;
   text-decoration: underline;
   font-size: 0.9rem;
+}
+
+.auth-tabs button:focus-visible,
+.auth-form input:focus-visible,
+.primary-btn:focus-visible,
+.btn-cancel:focus-visible {
+  outline: 2px solid hsla(160, 100%, 37%, 0.85);
+  outline-offset: 2px;
+}
+
+@media (max-width: 420px) {
+  .auth-tabs button {
+    padding-inline: 0.45rem;
+    font-size: 0.82rem;
+  }
 }
 
 </style>

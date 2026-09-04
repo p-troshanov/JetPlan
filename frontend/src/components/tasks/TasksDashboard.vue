@@ -231,7 +231,13 @@ const getPriorityLabel = (priority: string) => {
   <div class="tasks-dashboard">
     <div class="tasks-top-controls">
       <div class="controls-main-row">
-        <button class="btn btn-primary create-task-btn" @click="openCreateModal" :title="userStore.profile?.task_hotkey || 'Ctrl+Q'">
+        <button
+          type="button"
+          class="btn btn-primary create-task-btn"
+          aria-label="Создать задачу"
+          @click="openCreateModal"
+          :title="`Создать задачу (${userStore.profile?.task_hotkey || 'Ctrl+Q'})`"
+        >
           <svg class="btn-icon mobile-only" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
           <span class="btn-text">+ Создать задачу</span>
         </button>
@@ -239,12 +245,23 @@ const getPriorityLabel = (priority: string) => {
         <TaskSearch :result-count="filteredAndSortedTasks.length" />
 
         <div class="controls-right">
-          <button class="btn btn-secondary" @click="showFilters = !showFilters">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            :aria-expanded="showFilters"
+            :aria-label="showFilters ? 'Скрыть фильтры' : 'Показать фильтры'"
+            @click="showFilters = !showFilters"
+          >
             <svg class="btn-icon mobile-only" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>
             <span class="btn-text">{{ showFilters ? 'Скрыть' : 'Фильтры' }}</span>
             <svg class="dropdown-icon" :class="{'icon-rotated': showFilters}" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
           </button>
-          <button class="btn btn-secondary" @click="showCatModal = true">
+          <button
+            type="button"
+            class="btn btn-secondary"
+            aria-label="Управление категориями"
+            @click="showCatModal = true"
+          >
             <svg class="btn-icon mobile-only" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
             <span class="btn-text">Категории</span>
           </button>
@@ -333,7 +350,7 @@ const getPriorityLabel = (priority: string) => {
               </button>
             </div>
 
-            <div>
+            <div class="task-category">
               <span v-if="task.category" class="category-badge" :style="getCategoryStyle(task.category.name)">{{ task.category.name }}</span>
               <span v-else class="category-badge" style="opacity: 0.5">—</span>
             </div>
