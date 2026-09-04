@@ -1,4 +1,5 @@
 # backend/bot.py
+# Обрабатывает Telegram-команды, AI-ввод задач, callback-действия и доставку напоминаний.
 import logging
 import os
 import json
@@ -149,6 +150,8 @@ async def process_user_message(message: types.Message, text: str, processing_msg
             await session.commit()
             await session.refresh(idea_cat)
             categories.append(idea_cat)
+
+        allowed_category_ids = {category.id for category in categories}
 
         categories_str = "\n".join([f"- ID: {c.id}, Название: {c.name}" for c in categories])
         
@@ -339,7 +342,16 @@ async def process_user_message(message: types.Message, text: str, processing_msg
                 raw_desc = task_data.get('description')
                 desc_val = raw_desc if raw_desc else (existing_task.description if existing_task else text)
                 
-                cat_val = task_data.get('category_id') if 'category_id' in task_data else (existing_task.category_id if existing_task else None)
+                raw_category_id = (
+                    task_data.get('category_id')
+                    if 'category_id' in task_data
+                    else (existing_task.category_id if existing_task else None)
+                )
+                try:
+                    parsed_category_id = int(raw_category_id) if raw_category_id is not None else None
+                except (TypeError, ValueError):
+                    parsed_category_id = None
+                cat_val = parsed_category_id if parsed_category_id in allowed_category_ids else None
                 
                 raw_pri = task_data.get('priority')
                 pri_val = raw_pri if raw_pri else (existing_task.priority if existing_task else 'medium')

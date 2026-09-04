@@ -1,4 +1,5 @@
-// frontend/src/components/tasks/TaskModal.vue
+<!-- frontend/src/components/tasks/TaskModal.vue -->
+<!-- Создаёт и редактирует задачу, включая срок, категорию и напоминание. -->
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { useTasksStore } from '@/stores/tasks'
@@ -35,6 +36,13 @@ const adjustHeight = () => {
   if (descInput.value) {
     descInput.value.style.height = 'auto'
     descInput.value.style.height = `${descInput.value.scrollHeight}px`
+  }
+}
+
+const showNativePicker = (event: MouseEvent) => {
+  const input = event.currentTarget
+  if (input instanceof HTMLInputElement) {
+    input.showPicker?.()
   }
 }
 
@@ -162,13 +170,13 @@ const deleteTask = async () => {
               type="date" 
               v-model="formData.due_date" 
               class="form-control" 
-              @click="$event.target.showPicker && $event.target.showPicker()"
+              @click="showNativePicker"
             />
             <input 
               type="time" 
               v-model="formData.due_time" 
               class="form-control"
-              @click="$event.target.showPicker && $event.target.showPicker()" 
+              @click="showNativePicker"
             />
           </div>
         </div>

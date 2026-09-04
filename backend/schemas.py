@@ -1,5 +1,6 @@
 # backend/schemas.py
-from pydantic import BaseModel, ConfigDict
+# Определяет проверяемые request/response-контракты пользователей, Telegram, категорий и задач.
+from pydantic import BaseModel, ConfigDict, Field
 from typing import Optional, List
 from datetime import datetime
 
@@ -47,7 +48,7 @@ class TelegramRequestCodeRequest(BaseModel):
     username: str
 
 class TelegramVerifyCodeRequest(BaseModel):
-    code: str
+    code: str = Field(min_length=50, max_length=128)
     
 class InteractiveAuthRequest(BaseModel):
     username: str

@@ -1,4 +1,5 @@
 // frontend/src/stores/user.ts
+// Хранит профиль текущего пользователя и выполняет запросы его чтения и обновления.
 import { ref } from 'vue'
 import { defineStore } from 'pinia'
 
@@ -10,6 +11,7 @@ export interface UserProfile {
   ai_provider?: string;
   ai_api_key?: string;
   task_hotkey?: string;
+  auto_postpone_overdue?: boolean;
   telegram_id?: number;
 }
 

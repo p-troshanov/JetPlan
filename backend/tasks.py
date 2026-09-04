@@ -1,4 +1,5 @@
 # backend/tasks.py
+# Предоставляет API задач и категорий, AI-действия и фоновую обработку просроченных задач.
 import aiohttp
 import json
 import asyncio
@@ -13,6 +14,7 @@ from typing import List
 
 from backend.database import get_db, AsyncSessionLocal, Task, TaskCategory, UserProfile
 from backend.auth import get_current_user
+from backend.access_control import require_owned_task_category
 from backend.schemas import (
     TaskCategoryCreate, TaskCategoryUpdate, TaskCategoryResponse,
     TaskCreate, TaskUpdate, TaskResponse, TaskReorderRequest,
@@ -96,6 +98,8 @@ async def create_task(
     db: AsyncSession = Depends(get_db), 
     current_user: UserProfile = Depends(get_current_user)
 ):
+    await require_owned_task_category(db, data.category_id, current_user.id)
+
     # Находим максимальный order_index, чтобы новая задача упала в конец списка
     result = await db.execute(select(func.max(Task.order_index)).where(Task.user_id == current_user.id))
     max_order = result.scalar() or 0
@@ -165,6 +169,9 @@ async def update_task(
     
     old_status = task.status
     update_data = data.model_dump(exclude_unset=True)
+
+    if "category_id" in update_data:
+        await require_owned_task_category(db, update_data["category_id"], current_user.id)
     
     for key, value in update_data.items():
         setattr(task, key, value)

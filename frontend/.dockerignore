@@ -1,0 +1,13 @@
+# frontend/.dockerignore
+# Исключает локальные зависимости, сборки и env-файлы из frontend Docker build context.
+
+.env
+.env.*
+!.env.example
+node_modules
+dist
+dist-ssr
+*.local
+*.log
+.idea
+.vscode

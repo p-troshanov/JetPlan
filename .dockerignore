@@ -1,0 +1,27 @@
+# .dockerignore
+# Ограничивает backend Docker build context исходным кодом и исключает локальные секреты и артефакты.
+
+.git
+.gitignore
+.dockerignore
+.env
+.env.*
+!.env.example
+.gemini_backups
+.idea
+.vscode
+AGENTS.md
+backlog.md
+devlog.md
+project_index.md
+frontend
+nginx
+src
+venv
+__pycache__
+**/__pycache__
+*.py[cod]
+*.log
+dist
+dist-ssr
+node_modules

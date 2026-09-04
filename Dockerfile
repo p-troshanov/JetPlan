@@ -1,4 +1,5 @@
 # Dockerfile
+# Собирает минимальный runtime-образ FastAPI backend без локальных секретов и frontend-артефактов.
 FROM python:3.11-slim
 
 WORKDIR /app
@@ -15,8 +16,8 @@ COPY requirements.txt .
 RUN pip install --upgrade pip && \
     pip install --no-cache-dir -r requirements.txt
 
-# Копируем всё содержимое проекта
-COPY . .
+# Копируем только runtime-исходники backend; секреты передаются контейнеру через environment.
+COPY backend ./backend
 
 # Запускаем через модуль python -m
 CMD ["python", "-m", "uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

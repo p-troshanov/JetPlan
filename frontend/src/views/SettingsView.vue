@@ -1,4 +1,5 @@
-// frontend/src/views/SettingsView.vue
+<!-- frontend/src/views/SettingsView.vue -->
+<!-- Показывает профиль, настройки приложения, смену пароля и безопасную привязку Telegram. -->
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -95,8 +96,8 @@ const requestTelegramCode = async () => {
 }
 
 const verifyTelegramCode = async () => {
-  if (!tgCode.value || tgCode.value.length !== 4) {
-    showMessage('Введите 4-значный код', true)
+  if (!tgCode.value.trim()) {
+    showMessage('Вставьте одноразовый код из Telegram', true)
     return
   }
 
@@ -217,7 +218,15 @@ const verifyTelegramCode = async () => {
 
             <div v-else style="display: flex; gap: 0.5rem; flex-direction: column; max-width: 320px;">
               <div style="display: flex; gap: 0.5rem;">
-                <input type="text" v-model="tgCode" class="form-control" placeholder="1234" maxlength="4" />
+                <input
+                  type="text"
+                  v-model="tgCode"
+                  class="form-control"
+                  placeholder="Вставьте код из Telegram"
+                  maxlength="128"
+                  autocomplete="one-time-code"
+                  spellcheck="false"
+                />
                 <button class="btn btn-primary btn-auto" @click="verifyTelegramCode">Подтвердить</button>
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 0.5rem;">

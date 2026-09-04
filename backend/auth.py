@@ -1,8 +1,7 @@
 # backend/auth.py
+# Реализует web/Telegram-аутентификацию, профиль пользователя и проверку access token.
 import hashlib
 import hmac
-import random
-import string
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
@@ -23,6 +22,10 @@ from backend.schemas import (
     TelegramRequestCodeRequest, TelegramVerifyCodeRequest, InteractiveAuthRequest
 )
 from backend.bot import bot
+from backend.security import (
+    create_telegram_link_challenge,
+    telegram_link_challenge_belongs_to_user,
+)
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 SECRET_KEY = settings.SECRET_KEY
@@ -339,11 +342,13 @@ async def request_telegram_code(
 
     await db.execute(delete(TelegramLinkCode).where(TelegramLinkCode.telegram_id == cache.telegram_id))
     
-    while True:
-        code = ''.join(random.choices(string.digits, k=4))
+    for _ in range(3):
+        code = create_telegram_link_challenge(current_user.id, SECRET_KEY)
         res = await db.execute(select(TelegramLinkCode).where(TelegramLinkCode.code == code))
         if not res.scalar_one_or_none():
             break
+    else:
+        raise HTTPException(status_code=503, detail="Не удалось создать безопасный код. Повторите попытку.")
 
     expires_at = datetime.now(timezone.utc) + timedelta(minutes=10)
     
@@ -362,7 +367,11 @@ async def request_telegram_code(
     try:
         await bot.send_message(
             chat_id=cache.telegram_id,
-            text=f"Ваш код для привязки аккаунта JetPlan: <b>{code}</b>\nНикому его не сообщайте.",
+            text=(
+                "Ваш одноразовый код для привязки аккаунта JetPlan:\n"
+                f"<code>{code}</code>\n\n"
+                "Скопируйте код целиком. Никому его не сообщайте."
+            ),
             parse_mode="HTML"
         )
     except Exception as e:
@@ -377,7 +386,11 @@ async def verify_telegram_code(
     current_user: UserProfile = Depends(get_current_user)
 ):
     """ Эндпоинт для проверки отправленного кода """
-    result = await db.execute(select(TelegramLinkCode).where(TelegramLinkCode.code == data.code))
+    submitted_code = data.code.strip()
+    if not telegram_link_challenge_belongs_to_user(submitted_code, current_user.id, SECRET_KEY):
+        raise HTTPException(status_code=400, detail="Неверный или несуществующий код")
+
+    result = await db.execute(select(TelegramLinkCode).where(TelegramLinkCode.code == submitted_code))
     link_record = result.scalar_one_or_none()
     
     if not link_record:
@@ -387,6 +400,15 @@ async def verify_telegram_code(
         await db.delete(link_record)
         await db.commit()
         raise HTTPException(status_code=400, detail="Срок действия кода истек")
+
+    owner_result = await db.execute(
+        select(UserProfile).where(
+            UserProfile.telegram_id == link_record.telegram_id,
+            UserProfile.id != current_user.id,
+        )
+    )
+    if owner_result.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Этот Telegram уже привязан к другому аккаунту")
         
     current_user.telegram_id = link_record.telegram_id
     if not current_user.first_name and link_record.first_name:

@@ -1,4 +1,5 @@
-// frontend/src/views/HomeView.vue
+<!-- frontend/src/views/HomeView.vue -->
+<!-- Управляет входом пользователя и отображает основной экран задач после авторизации. -->
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
@@ -18,7 +19,20 @@ const errorMessage = ref('')
 const tgUsername = ref('')
 const authRequestId = ref('')
 const tgAuthStatus = ref('')
-let tgPollInterval: any = null
+let tgPollInterval: ReturnType<typeof setInterval> | null = null
+
+const stopTelegramPolling = () => {
+  if (tgPollInterval !== null) {
+    clearInterval(tgPollInterval)
+    tgPollInterval = null
+  }
+}
+
+const cancelTelegramInteractiveAuth = () => {
+  stopTelegramPolling()
+  authRequestId.value = ''
+  tgAuthStatus.value = ''
+}
 
 onMounted(() => {
   if (userToken.value) {
@@ -27,7 +41,7 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
-  if (tgPollInterval) clearInterval(tgPollInterval)
+  stopTelegramPolling()
 })
 
 // Авторизация по логину/паролю
@@ -127,19 +141,19 @@ const pollTelegramAuthStatus = async () => {
     if (response.ok) {
       const data = await response.json();
       if (data.status === 'approved') {
-        clearInterval(tgPollInterval);
+        stopTelegramPolling();
         localStorage.setItem('access_token', data.access_token);
         userToken.value = data.access_token;
         isAuthenticated.value = true;
         authRequestId.value = '';
         tgAuthStatus.value = '';
       } else if (data.status === 'denied') {
-        clearInterval(tgPollInterval);
+        stopTelegramPolling();
         errorMessage.value = 'Вход был отклонен в боте.';
         authRequestId.value = '';
         tgAuthStatus.value = '';
       } else if (data.status === 'expired') {
-        clearInterval(tgPollInterval);
+        stopTelegramPolling();
         errorMessage.value = 'Время ожидания вышло. Попробуйте снова.';
         authRequestId.value = '';
         tgAuthStatus.value = '';
@@ -154,7 +168,7 @@ const logout = () => {
   localStorage.removeItem('access_token');
   userToken.value = '';
   isAuthenticated.value = false;
-  if (tgPollInterval) clearInterval(tgPollInterval);
+  stopTelegramPolling();
 };
 </script>
 
@@ -193,7 +207,7 @@ const logout = () => {
         <div v-else class="polling-status">
           <div class="spinner"></div>
           <p>{{ tgAuthStatus }}</p>
-          <button @click="() => { clearInterval(tgPollInterval); authRequestId = ''; }" class="btn-cancel">Отмена</button>
+          <button @click="cancelTelegramInteractiveAuth" class="btn-cancel">Отмена</button>
         </div>
         
         <p class="hint" v-if="!authRequestId">Бот пришлет вам сообщение с кнопкой подтверждения. Вы должны хотя бы раз нажать /start в боте перед этим.</p>
